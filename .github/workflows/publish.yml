@@ -12,9 +12,9 @@ jobs:
       - name: Set-up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "23.x"
+          node-version: "22.x"
       - run: yarn install
-      - run: yarn build
+      - run: yarn build-only
       - name: Deploy
         uses: crazy-max/ghaction-github-pages@v4
         with:
