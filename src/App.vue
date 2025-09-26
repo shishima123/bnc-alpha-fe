@@ -284,20 +284,20 @@ function batchImportWallets() {
 
         <!-- Loading Skeleton -->
         <div v-if="isLoadingResult" class="grid grid-cols-2 gap-4">
-          <div class="text-left">
-            <Skeleton width="6rem" height="1.25rem" />
+          <div class="flex flex-col items-center justify-center">
+            <Skeleton width="6rem" height="28px" />
             <div class="text-xs text-gray-400 mt-1">Khối lượng</div>
           </div>
-          <div class="text-left">
-            <Skeleton width="5rem" height="1.25rem" />
+          <div class="flex flex-col items-center justify-center">
+            <Skeleton width="5rem" height="28px" />
             <div class="text-xs text-gray-400 mt-1">Phí</div>
           </div>
-          <div class="text-left">
-            <Skeleton width="4rem" height="1.25rem" />
+          <div class="flex flex-col items-center justify-center">
+            <Skeleton width="4rem" height="28px" />
             <div class="text-xs text-gray-400 mt-1">Điểm</div>
           </div>
-          <div class="text-left">
-            <Skeleton width="3rem" height="1.25rem" />
+          <div class="flex flex-col items-center justify-center">
+            <Skeleton width="3rem" height="28px" />
             <div class="text-xs text-gray-400 mt-1">Số lần</div>
           </div>
         </div>

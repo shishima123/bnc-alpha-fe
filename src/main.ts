@@ -6,6 +6,7 @@ import App from './App.vue'
 import PrimeVue from 'primevue/config'
 import Aura from '@primeuix/themes/aura'
 import ToastService from 'primevue/toastservice'
+import './registerServiceWorker'
 
 const app = createApp(App)
 app.use(ToastService)
