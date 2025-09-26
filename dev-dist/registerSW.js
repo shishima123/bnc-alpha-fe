@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) navigator.serviceWorker.register('/bnc-alpha-fe/dev-sw.js?dev-sw', { scope: '/bnc-alpha-fe/', type: 'classic' })
