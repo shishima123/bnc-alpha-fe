@@ -23,6 +23,9 @@ const prices = ref<PriceMap>({})
 const shouldShowWalletModal = ref(false)
 const isLoadingResult = ref(false)
 
+// track ví đang loading
+const loadingWallets = ref<Set<string>>(new Set())
+
 // popup chi tiết
 const shouldShowHistoryDialog = ref(false)
 const activeWalletAddress = ref<string | null>(null)
@@ -46,6 +49,9 @@ async function fetchDataAll() {
     return
   }
 
+  // 🆕 Clear dữ liệu cũ để tránh bị nhấp nháy skeleton + data
+  transactionsByWallet.value = {}
+
   isLoadingResult.value = true
   try {
     const addresses = wallets.value.map((w) => w.address)
@@ -60,7 +66,7 @@ async function fetchDataAll() {
     transactionsByWallet.value = res.data
     await fetchPrices()
     await calculateVolume()
-  } catch (err) {
+  } catch (err: any) {
     console.error('Fetch data error:', err)
     toast.add({
       severity: 'error',
@@ -70,6 +76,33 @@ async function fetchDataAll() {
     })
   } finally {
     isLoadingResult.value = false
+  }
+}
+
+// 🆕 Hàm chỉ fetch cho 1 ví
+async function fetchDataForWallet(address: string) {
+  loadingWallets.value.add(address)
+  try {
+    const res = await axiosInstance.get(`/api/transactions`, {
+      params: {
+        addresses: address,
+        date: moment(selectedDate.value).format('YYYY-MM-DD'),
+      },
+    })
+
+    transactionsByWallet.value[address] = res.data[address] || []
+    await fetchPrices()
+    await calculateVolume()
+  } catch (err: any) {
+    console.error(`Fetch error for ${address}:`, err)
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi',
+      detail: err.message,
+      life: 3000,
+    })
+  } finally {
+    loadingWallets.value.delete(address)
   }
 }
 
@@ -267,6 +300,7 @@ function batchImportWallets() {
             label="Kiểm tra"
             @click="fetchDataAll"
             class="w-1/2 sm:w-auto p-button-success"
+            :disabled="isLoadingResult"
           />
         </div>
       </div>
@@ -279,11 +313,24 @@ function batchImportWallets() {
         :key="wallet.address"
         class="bg-white rounded-2xl shadow p-4 flex flex-col justify-between hover:shadow-md transition"
       >
-        <!-- Title -->
-        <h2 class="font-semibold text-blue-600 mb-3">{{ wallet.label }}</h2>
+        <!-- Title + Reload button -->
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="font-semibold text-blue-600">{{ wallet.label }}</h2>
+          <Button
+            icon="pi pi-refresh"
+            size="small"
+            severity="secondary"
+            text
+            @click="fetchDataForWallet(wallet.address)"
+            :disabled="isLoadingResult || loadingWallets.has(wallet.address)"
+          />
+        </div>
 
-        <!-- Loading Skeleton -->
-        <div v-if="isLoadingResult" class="grid grid-cols-2 gap-4">
+        <!-- Loading Skeleton (toàn bộ hoặc từng ví) -->
+        <div
+          v-if="isLoadingResult || loadingWallets.has(wallet.address)"
+          class="grid grid-cols-2 gap-4"
+        >
           <div class="flex flex-col items-center justify-center">
             <Skeleton width="6rem" height="28px" />
             <div class="text-xs text-gray-400 mt-1">Khối lượng</div>
