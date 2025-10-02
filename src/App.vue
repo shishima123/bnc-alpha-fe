@@ -65,7 +65,7 @@ async function fetchDataAll() {
     toast.add({
       severity: 'error',
       summary: 'Lỗi',
-      detail: 'Không thể tải dữ liệu',
+      detail: err.message,
       life: 3000,
     })
   } finally {
