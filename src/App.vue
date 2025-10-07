@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import axiosInstance from '@/apis/http-common.ts'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { PriceMap, Transaction, Wallet } from '@/types/types'
 import {
   useShortenAddress,
@@ -32,6 +32,13 @@ const activeWalletAddress = ref<string | null>(null)
 
 // 🆕 Thêm DatePicker state
 const selectedDate = ref<Date>(new Date())
+
+const walletWithDataCount = computed(() => {
+  return wallets.value.filter((w) => (transactionsByWallet.value[w.address]?.length || 0) > 0)
+    .length
+})
+
+const totalWalletCount = computed(() => wallets.value.length)
 
 function openHistory(address: string) {
   activeWalletAddress.value = address
@@ -305,7 +312,19 @@ function batchImportWallets() {
         </div>
       </div>
     </div>
-
+    <!-- Summary tổng quan -->
+    <div
+      v-if="totalWalletCount > 0"
+      class="inline-flex items-center gap-1.5 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-xl text-sm text-gray-700 shadow-sm mb-5"
+    >
+      <i class="pi pi-chart-bar text-green-600 text-base"></i>
+      <span>
+        Đã có dữ liệu:
+        <span class="font-bold text-green-600">{{ walletWithDataCount }}</span>
+        /
+        <span class="font-bold">{{ totalWalletCount }}</span> ví
+      </span>
+    </div>
     <!-- Wallet cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       <div
@@ -581,14 +600,3 @@ function batchImportWallets() {
     <Toast />
   </main>
 </template>
-
-<style>
-.v-enter-active,
-.v-leave-active {
-  transition: opacity 0.5s ease;
-}
-.v-enter-from,
-.v-leave-to {
-  opacity: 0;
-}
-</style>
