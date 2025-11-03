@@ -33,6 +33,14 @@ const activeWalletAddress = ref<string | null>(null)
 // 🆕 Thêm DatePicker state
 const selectedDate = ref<Date>(new Date())
 
+// 🧭 Menu options cho SplitButton
+const checkOptions = [
+  {
+    label: 'Chỉ kiểm tra ví chưa có kết quả',
+    command: () => fetchDataMissingOnly(),
+  },
+]
+
 const walletWithDataCount = computed(() => {
   return wallets.value.filter((w) => (transactionsByWallet.value[w.address]?.length || 0) > 0)
     .length
@@ -78,7 +86,7 @@ async function fetchDataAll() {
     toast.add({
       severity: 'error',
       summary: 'Lỗi',
-      detail: err.message,
+      detail: err.response?.data?.message || 'Không thể lấy dữ liệu',
       life: 3000,
     })
   } finally {
@@ -105,11 +113,63 @@ async function fetchDataForWallet(address: string) {
     toast.add({
       severity: 'error',
       summary: 'Lỗi',
-      detail: err.message,
+      detail: err.response?.data?.message || 'Không thể lấy dữ liệu',
       life: 3000,
     })
   } finally {
     loadingWallets.value.delete(address)
+  }
+}
+
+// 🧩 Kiểm tra chỉ những ví chưa có dữ liệu
+async function fetchDataMissingOnly() {
+  const missingWallets = wallets.value
+    .filter(
+      (w) =>
+        !transactionsByWallet.value[w.address] ||
+        transactionsByWallet.value[w.address].length === 0,
+    )
+    .map((w) => w.address)
+
+  if (missingWallets.length === 0) {
+    toast.add({
+      severity: 'info',
+      summary: 'Thông báo',
+      detail: 'Tất cả ví đều đã có dữ liệu',
+      life: 3000,
+    })
+    return
+  }
+
+  // 🧠 Đánh dấu ví đang loading
+  missingWallets.forEach((addr) => loadingWallets.value.add(addr))
+
+  try {
+    const res = await axiosInstance.get(`/api/transactions`, {
+      params: {
+        addresses: missingWallets.join(','),
+        date: moment(selectedDate.value).format('YYYY-MM-DD'),
+      },
+    })
+
+    // 🧩 Gộp kết quả vào transactionsByWallet
+    for (const [addr, data] of Object.entries(res.data)) {
+      transactionsByWallet.value[addr] = data as Transaction[]
+    }
+
+    await fetchPrices()
+    await calculateVolume()
+  } catch (err: any) {
+    console.error('Fetch missing data error:', err)
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi',
+      detail: err.response?.data?.message || 'Không thể lấy dữ liệu',
+      life: 3000,
+    })
+  } finally {
+    // ✅ Chỉ clear loading cho các ví thiếu
+    missingWallets.forEach((addr) => loadingWallets.value.delete(addr))
   }
 }
 
@@ -302,11 +362,12 @@ function batchImportWallets() {
             @click="shouldShowWalletModal = true"
             class="w-1/2 sm:w-auto p-button-outlined p-button-secondary"
           />
-          <Button
+          <SplitButton
             icon="pi pi-sync"
             label="Kiểm tra"
-            @click="fetchDataAll"
             class="w-1/2 sm:w-auto p-button-success"
+            :model="checkOptions"
+            @click="fetchDataAll"
             :disabled="isLoadingResult"
           />
         </div>
