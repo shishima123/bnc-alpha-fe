@@ -8,6 +8,7 @@ import {
   closestPowerOfTwo,
   formatNumber,
   isValidBscAddress,
+  addressGradient,
 } from './helpers/ultils.ts'
 import moment from 'moment'
 import { useStorage } from '@vueuse/core'
@@ -28,6 +29,7 @@ const shouldShowHistoryDialog = ref(false)
 const activeWalletAddress = ref<string | null>(null)
 const selectedDate = ref<string>(moment(new Date()).format('YYYY-MM-DD'))
 
+const sortBy = ref<'default' | 'points' | 'volume'>('default')
 const showCheckMenu = ref(false)
 const checkBtnRef = ref<HTMLDivElement | null>(null)
 
@@ -39,13 +41,62 @@ function handleClickOutside(e: MouseEvent) {
 onMounted(() => document.addEventListener('click', handleClickOutside))
 onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 
-const walletWithDataCount = computed(
-  () =>
-    wallets.value.filter((w) => (transactionsByWallet.value[w.address]?.length || 0) > 0).length,
-)
-const totalWalletCount = computed(() => wallets.value.length)
+function getWalletStats(address: string) {
+  const txs = transactionsByWallet.value[address] || []
+  const totalVolumeUSD = txs.reduce((total, tx) => total + (tx as any).volumeUSD, 0)
+  const points = closestPowerOfTwo(totalVolumeUSD)
+  const gasFeeBNB = txs.reduce((sum, tx) => sum + tx.gas, 0)
+  const gasFeeUSDT = gasFeeBNB * (prices.value['BNB'] || 0)
+
+  let sent = 0
+  let received = 0
+  txs.forEach((tx) => {
+    if (tx.status !== 'success') return
+    if (tx.from.symbol === 'USDT') sent += tx.from.amount
+    if (tx.to.symbol === 'USDT') received += tx.to.amount
+  })
+
+  const usdtFee = received - sent
+  const totalFee = usdtFee - gasFeeUSDT
+  const transactionsCount = txs.length
+
+  return { totalVolumeUSD, points, gasFeeBNB, gasFeeUSDT, totalFee, transactionsCount }
+}
+
+function hasData(address: string) {
+  return (transactionsByWallet.value[address]?.length || 0) > 0
+}
+
+const sortedWallets = computed(() => {
+  if (sortBy.value === 'default') return wallets.value
+  const items = [...wallets.value]
+  if (sortBy.value === 'points') {
+    items.sort((a, b) => getWalletStats(b.address).points - getWalletStats(a.address).points)
+  } else if (sortBy.value === 'volume') {
+    items.sort(
+      (a, b) => getWalletStats(b.address).totalVolumeUSD - getWalletStats(a.address).totalVolumeUSD,
+    )
+  }
+  return items
+})
+
+const totals = computed(() => {
+  let volume = 0
+  let points = 0
+  let txCount = 0
+  let withData = 0
+  for (const w of wallets.value) {
+    const s = getWalletStats(w.address)
+    volume += s.totalVolumeUSD
+    points += s.points
+    txCount += s.transactionsCount
+    if (hasData(w.address)) withData++
+  }
+  return { volume, points, txCount, withData, total: wallets.value.length }
+})
 
 function openHistory(address: string) {
+  if (!hasData(address)) return
   activeWalletAddress.value = address
   shouldShowHistoryDialog.value = true
 }
@@ -102,11 +153,7 @@ async function fetchDataForWallet(address: string) {
 async function fetchDataMissingOnly() {
   showCheckMenu.value = false
   const missingWallets = wallets.value
-    .filter(
-      (w) =>
-        !transactionsByWallet.value[w.address] ||
-        transactionsByWallet.value[w.address].length === 0,
-    )
+    .filter((w) => !hasData(w.address))
     .map((w) => w.address)
 
   if (missingWallets.length === 0) {
@@ -157,28 +204,6 @@ const calculateVolume = async () => {
   }
 }
 
-function getWalletStats(address: string) {
-  const txs = transactionsByWallet.value[address] || []
-  const totalVolumeUSD = txs.reduce((total, tx) => total + (tx as any).volumeUSD, 0)
-  const points = closestPowerOfTwo(totalVolumeUSD)
-  const gasFeeBNB = txs.reduce((sum, tx) => sum + tx.gas, 0)
-  const gasFeeUSDT = gasFeeBNB * (prices.value['BNB'] || 0)
-
-  let sent = 0
-  let received = 0
-  txs.forEach((tx) => {
-    if (tx.status !== 'success') return
-    if (tx.from.symbol === 'USDT') sent += tx.from.amount
-    if (tx.to.symbol === 'USDT') received += tx.to.amount
-  })
-
-  const usdtFee = received - sent
-  const totalFee = usdtFee - gasFeeUSDT
-  const transactionsCount = txs.length
-
-  return { totalVolumeUSD, points, gasFeeBNB, gasFeeUSDT, totalFee, transactionsCount }
-}
-
 const newWalletAddress = ref('')
 const newWalletLabel = ref('')
 
@@ -222,12 +247,11 @@ function batchImportWallets() {
   })
 
   batchImportText.value = ''
-
   if (addedCount > 0) {
     addToast({
       severity: 'success',
       summary: 'Thành công',
-      detail: `Đã thêm ${addedCount} ví từ batch import`,
+      detail: `Đã thêm ${addedCount} ví`,
       life: 2000,
     })
   }
@@ -235,107 +259,144 @@ function batchImportWallets() {
 </script>
 
 <template>
-  <main class="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-    <!-- Header -->
-    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
-      <div>
-        <h1
-          class="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-emerald-400 via-teal-300 to-sky-400 bg-clip-text text-transparent"
+  <!-- Sticky top bar -->
+  <header
+    class="sticky top-0 z-30 bg-zinc-900/80 backdrop-blur-md border-b border-zinc-800"
+  >
+    <div
+      class="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3"
+    >
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div
+          class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-sky-500 flex items-center justify-center font-bold text-zinc-900 shadow-lg shadow-emerald-500/30 shrink-0"
         >
-          Thống kê Binance Alpha
-        </h1>
-        <p class="text-sm text-zinc-500 mt-1">Theo dõi khối lượng và điểm Alpha theo ngày</p>
+          α
+        </div>
+        <div class="min-w-0">
+          <h1 class="font-semibold text-zinc-100 text-sm sm:text-base leading-tight">
+            Alpha Tracker
+          </h1>
+          <p class="text-xs text-zinc-500 hidden sm:block leading-tight">
+            Binance Alpha · BSC
+          </p>
+        </div>
       </div>
 
-      <div class="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
-        <!-- Date input -->
-        <div class="relative">
-          <i
-            class="pi pi-calendar absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm pointer-events-none"
-          ></i>
-          <input
-            type="date"
-            v-model="selectedDate"
-            class="w-full sm:w-auto bg-zinc-800 border border-zinc-700 rounded-xl pl-9 pr-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 transition"
-          />
-        </div>
-
-        <!-- Manage wallet -->
+      <!-- Run split button -->
+      <div ref="checkBtnRef" class="relative flex">
         <button
-          @click="shouldShowWalletModal = true"
-          class="flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 hover:border-zinc-600 rounded-xl px-4 py-2 text-sm text-zinc-100 transition"
+          @click="fetchDataAll"
+          :disabled="isLoadingResult"
+          class="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-zinc-900 font-semibold rounded-l-lg px-3.5 py-2 text-sm transition shadow-lg shadow-emerald-500/20"
         >
-          <i class="pi pi-cog text-sm"></i>
-          <span>Quản lý ví</span>
+          <i
+            class="pi pi-sync text-sm"
+            :class="{ 'animate-spin': isLoadingResult }"
+          ></i>
+          <span class="hidden xs:inline sm:inline">Kiểm tra</span>
+        </button>
+        <button
+          @click="showCheckMenu = !showCheckMenu"
+          :disabled="isLoadingResult"
+          class="flex items-center justify-center bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-zinc-900 rounded-r-lg px-2 py-2 border-l border-emerald-700 transition"
+          aria-label="More options"
+        >
+          <i class="pi pi-chevron-down text-xs"></i>
         </button>
 
-        <!-- Check split button -->
-        <div ref="checkBtnRef" class="relative flex">
-          <button
-            @click="fetchDataAll"
-            :disabled="isLoadingResult"
-            class="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-zinc-900 font-semibold rounded-l-xl px-4 py-2 text-sm transition shadow-lg shadow-emerald-500/20"
+        <transition name="dropdown">
+          <div
+            v-if="showCheckMenu"
+            class="absolute right-0 top-full mt-2 w-72 bg-zinc-800 border border-zinc-700 rounded-xl shadow-2xl overflow-hidden z-30"
           >
-            <i
-              class="pi pi-sync text-sm"
-              :class="{ 'animate-spin': isLoadingResult }"
-            ></i>
-            <span>Kiểm tra</span>
-          </button>
-          <button
-            @click="showCheckMenu = !showCheckMenu"
-            :disabled="isLoadingResult"
-            class="flex items-center justify-center bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-zinc-900 rounded-r-xl px-2.5 py-2 border-l border-emerald-700 transition"
-            aria-label="More options"
-          >
-            <i class="pi pi-chevron-down text-xs"></i>
-          </button>
-
-          <!-- Dropdown -->
-          <transition name="dropdown">
-            <div
-              v-if="showCheckMenu"
-              class="absolute right-0 top-full mt-2 w-72 bg-zinc-800 border border-zinc-700 rounded-xl shadow-2xl overflow-hidden z-30"
+            <button
+              @click="fetchDataMissingOnly"
+              class="w-full flex items-center gap-2 px-4 py-3 text-sm text-zinc-200 hover:bg-zinc-700 transition text-left"
             >
-              <button
-                @click="fetchDataMissingOnly"
-                class="w-full flex items-center gap-2 px-4 py-3 text-sm text-zinc-200 hover:bg-zinc-700 transition text-left"
-              >
-                <i class="pi pi-filter text-emerald-400 text-sm"></i>
-                <span>Chỉ kiểm tra ví chưa có kết quả</span>
-              </button>
-            </div>
-          </transition>
-        </div>
+              <i class="pi pi-filter text-emerald-400 text-sm"></i>
+              <span>Chỉ kiểm tra ví chưa có kết quả</span>
+            </button>
+          </div>
+        </transition>
       </div>
     </div>
+  </header>
 
-    <!-- Summary pill -->
-    <div
-      v-if="totalWalletCount > 0"
-      class="inline-flex items-center gap-2 bg-zinc-800/50 border border-zinc-700 px-3.5 py-1.5 rounded-full text-sm text-zinc-300 mb-6 backdrop-blur"
-    >
-      <i class="pi pi-chart-bar text-emerald-400 text-sm"></i>
-      <span>
-        Đã có dữ liệu:
-        <span class="font-semibold text-emerald-400">{{ walletWithDataCount }}</span>
-        <span class="text-zinc-500 mx-0.5">/</span>
-        <span class="font-semibold text-zinc-100">{{ totalWalletCount }}</span> ví
-      </span>
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+    <!-- Action row: date + manage -->
+    <div class="flex flex-col sm:flex-row gap-2 mb-6">
+      <div class="relative flex-1 sm:max-w-[220px]">
+        <i
+          class="pi pi-calendar absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm pointer-events-none"
+        ></i>
+        <input
+          type="date"
+          v-model="selectedDate"
+          class="w-full bg-zinc-800/60 border border-zinc-700 rounded-xl pl-9 pr-3 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 transition"
+        />
+      </div>
+      <button
+        @click="shouldShowWalletModal = true"
+        class="flex items-center justify-center gap-2 bg-zinc-800/60 hover:bg-zinc-700 border border-zinc-700 hover:border-zinc-600 rounded-xl px-4 py-2.5 text-sm text-zinc-100 transition"
+      >
+        <i class="pi pi-cog text-sm"></i>
+        <span>Quản lý ví</span>
+      </button>
     </div>
 
-    <!-- Empty state -->
-    <div
-      v-if="totalWalletCount === 0"
-      class="flex flex-col items-center justify-center py-20 text-center"
+    <!-- Hero summary -->
+    <section
+      v-if="totals.total > 0"
+      class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8"
     >
       <div
-        class="w-16 h-16 rounded-2xl bg-zinc-800 border border-zinc-700 flex items-center justify-center mb-4"
+        class="bg-gradient-to-br from-emerald-500/10 to-emerald-500/[0.02] border border-emerald-500/20 rounded-2xl p-4 sm:p-5"
+      >
+        <div class="text-[11px] uppercase tracking-wider text-emerald-400/80 font-medium">
+          Tổng khối lượng
+        </div>
+        <div class="text-2xl sm:text-3xl font-bold text-zinc-100 mt-1.5 tabular-nums">
+          ${{ formatNumber(totals.volume) }}
+        </div>
+      </div>
+      <div class="bg-zinc-800/50 border border-zinc-700 rounded-2xl p-4 sm:p-5">
+        <div class="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">
+          Tổng điểm
+        </div>
+        <div class="text-2xl sm:text-3xl font-bold text-zinc-100 mt-1.5 tabular-nums">
+          {{ totals.points }}
+        </div>
+      </div>
+      <div class="bg-zinc-800/50 border border-zinc-700 rounded-2xl p-4 sm:p-5">
+        <div class="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">
+          Giao dịch
+        </div>
+        <div class="text-2xl sm:text-3xl font-bold text-zinc-100 mt-1.5 tabular-nums">
+          {{ totals.txCount }}
+        </div>
+      </div>
+      <div class="bg-zinc-800/50 border border-zinc-700 rounded-2xl p-4 sm:p-5">
+        <div class="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">
+          Ví có dữ liệu
+        </div>
+        <div class="text-2xl sm:text-3xl font-bold text-zinc-100 mt-1.5 tabular-nums">
+          {{ totals.withData }}<span class="text-zinc-500 text-xl">/{{ totals.total }}</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Empty -->
+    <div
+      v-if="totals.total === 0"
+      class="flex flex-col items-center justify-center py-24 text-center"
+    >
+      <div
+        class="w-16 h-16 rounded-2xl bg-zinc-800/60 border border-zinc-700 flex items-center justify-center mb-4"
       >
         <i class="pi pi-wallet text-2xl text-zinc-600"></i>
       </div>
       <h3 class="text-lg font-semibold text-zinc-200 mb-1">Chưa có ví nào</h3>
-      <p class="text-sm text-zinc-500 mb-4">Thêm ví đầu tiên để bắt đầu theo dõi</p>
+      <p class="text-sm text-zinc-500 mb-5">Thêm ví đầu tiên để bắt đầu theo dõi</p>
       <button
         @click="shouldShowWalletModal = true"
         class="bg-emerald-500 hover:bg-emerald-400 text-zinc-900 font-semibold rounded-xl px-5 py-2.5 text-sm transition"
@@ -344,25 +405,60 @@ function batchImportWallets() {
       </button>
     </div>
 
+    <!-- Section header -->
+    <div v-if="totals.total > 0" class="flex items-center justify-between mb-3">
+      <h2 class="text-sm font-semibold text-zinc-300">
+        Ví của bạn
+        <span class="text-zinc-500 font-normal">({{ wallets.length }})</span>
+      </h2>
+      <div class="relative">
+        <select
+          v-model="sortBy"
+          class="bg-zinc-800/60 border border-zinc-700 hover:border-zinc-600 rounded-lg pl-2.5 pr-7 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-emerald-500/60 transition appearance-none cursor-pointer"
+        >
+          <option value="default">Sắp xếp: Mặc định</option>
+          <option value="points">Sắp xếp: Điểm cao</option>
+          <option value="volume">Sắp xếp: Volume cao</option>
+        </select>
+        <i
+          class="pi pi-chevron-down absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500 pointer-events-none"
+        ></i>
+      </div>
+    </div>
+
     <!-- Wallet grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <div
-        v-for="wallet in wallets"
+      <article
+        v-for="wallet in sortedWallets"
         :key="wallet.address"
-        class="group relative bg-zinc-800/50 border border-zinc-700 hover:border-zinc-600 rounded-2xl p-5 backdrop-blur transition shadow-lg shadow-black/20 hover:shadow-emerald-500/5"
+        class="group bg-zinc-800/50 border border-zinc-700 rounded-2xl overflow-hidden transition shadow-lg shadow-black/20"
+        :class="{
+          'hover:border-zinc-600 hover:shadow-emerald-500/5 cursor-pointer': hasData(
+            wallet.address,
+          ),
+        }"
+        @click="openHistory(wallet.address)"
       >
-        <!-- Card glow on hover -->
-        <div
-          class="absolute inset-0 rounded-2xl pointer-events-none opacity-0 group-hover:opacity-100 transition bg-gradient-to-br from-emerald-500/[0.04] to-transparent"
-        ></div>
-
-        <!-- Title row -->
-        <div class="relative flex justify-between items-center mb-4">
-          <h2 class="font-semibold text-zinc-100 truncate pr-2">
-            {{ wallet.label }}
-          </h2>
+        <!-- Card header -->
+        <header
+          class="flex items-center justify-between px-4 py-3 border-b border-zinc-700/60"
+        >
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div
+              class="w-9 h-9 rounded-lg shrink-0 ring-1 ring-zinc-700"
+              :style="{ background: addressGradient(wallet.address) }"
+            ></div>
+            <div class="min-w-0">
+              <h3 class="font-semibold text-zinc-100 text-sm truncate">
+                {{ wallet.label }}
+              </h3>
+              <p class="text-[11px] font-mono text-zinc-500 truncate">
+                {{ useShortenAddress(wallet.address) }}
+              </p>
+            </div>
+          </div>
           <button
-            @click="fetchDataForWallet(wallet.address)"
+            @click.stop="fetchDataForWallet(wallet.address)"
             :disabled="isLoadingResult || loadingWallets.has(wallet.address)"
             class="text-zinc-500 hover:text-emerald-400 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed w-8 h-8 rounded-lg flex items-center justify-center transition shrink-0"
             title="Reload ví này"
@@ -372,75 +468,92 @@ function batchImportWallets() {
               :class="{ 'animate-spin': loadingWallets.has(wallet.address) }"
             ></i>
           </button>
-        </div>
+        </header>
 
-        <!-- Loading state -->
+        <!-- Loading -->
         <div
           v-if="isLoadingResult || loadingWallets.has(wallet.address)"
-          class="relative grid grid-cols-2 gap-4"
+          class="grid grid-cols-2 divide-x divide-zinc-700/60"
         >
-          <div v-for="i in 4" :key="i" class="text-center">
-            <div class="h-7 mx-auto w-20 rounded-md bg-zinc-700 animate-pulse"></div>
-            <div class="h-3 mt-2 mx-auto w-14 rounded bg-zinc-700/60 animate-pulse"></div>
+          <div class="p-5 text-center">
+            <div class="h-8 w-24 mx-auto rounded-md bg-zinc-700 animate-pulse"></div>
+            <div class="h-3 w-16 mx-auto mt-2 rounded bg-zinc-700/60 animate-pulse"></div>
+          </div>
+          <div class="p-5 text-center">
+            <div class="h-8 w-12 mx-auto rounded-md bg-zinc-700 animate-pulse"></div>
+            <div class="h-3 w-12 mx-auto mt-2 rounded bg-zinc-700/60 animate-pulse"></div>
           </div>
         </div>
 
-        <!-- Data -->
+        <!-- Hero stats -->
         <div
-          v-else-if="(transactionsByWallet[wallet.address]?.length || 0) > 0"
-          class="relative grid grid-cols-2 gap-4"
+          v-else-if="hasData(wallet.address)"
+          class="grid grid-cols-2 divide-x divide-zinc-700/60"
         >
-          <div class="text-center">
-            <div class="text-2xl font-bold text-zinc-100">
+          <div class="p-5 text-center">
+            <div class="text-2xl sm:text-[26px] font-bold text-zinc-100 tabular-nums">
               ${{ formatNumber(getWalletStats(wallet.address).totalVolumeUSD) }}
             </div>
-            <div class="text-xs text-zinc-500 mt-0.5">Khối lượng</div>
-          </div>
-          <div class="text-center">
-            <div
-              class="text-2xl font-bold"
-              :class="
-                getWalletStats(wallet.address).totalFee >= 0
-                  ? 'text-emerald-400'
-                  : 'text-rose-400'
-              "
-            >
-              {{ formatNumber(getWalletStats(wallet.address).totalFee) }}
+            <div class="text-[11px] uppercase tracking-wider text-zinc-500 mt-1 font-medium">
+              Khối lượng
             </div>
-            <div class="text-xs text-zinc-500 mt-0.5">Phí</div>
           </div>
-          <div class="text-center">
-            <div class="text-2xl font-bold text-emerald-400">
+          <div class="p-5 text-center">
+            <div
+              class="text-2xl sm:text-[26px] font-bold text-emerald-400 tabular-nums"
+            >
               {{ getWalletStats(wallet.address).points }}
             </div>
-            <div class="text-xs text-zinc-500 mt-0.5">Điểm</div>
-          </div>
-          <div class="text-center">
-            <div class="text-2xl font-bold text-zinc-100">
-              {{ getWalletStats(wallet.address).transactionsCount }}
+            <div class="text-[11px] uppercase tracking-wider text-zinc-500 mt-1 font-medium">
+              Điểm
             </div>
-            <div class="text-xs text-zinc-500 mt-0.5">Số lần</div>
-          </div>
-          <div class="col-span-2 flex justify-center mt-1">
-            <button
-              @click="openHistory(wallet.address)"
-              class="text-xs text-zinc-300 hover:text-emerald-400 bg-zinc-700/50 hover:bg-zinc-600 border border-zinc-700 hover:border-zinc-600 rounded-lg px-3 py-1.5 transition flex items-center gap-1.5"
-            >
-              <i class="pi pi-list text-[10px]"></i>
-              Chi tiết
-            </button>
           </div>
         </div>
 
-        <!-- Empty -->
+        <!-- No data -->
         <div
           v-else
-          class="relative flex flex-col items-center justify-center text-zinc-600 h-28 gap-2"
+          class="flex flex-col items-center justify-center py-7 text-zinc-600 gap-1.5"
         >
-          <i class="pi pi-database text-2xl"></i>
-          <p class="text-xs">Chưa có dữ liệu giao dịch</p>
+          <i class="pi pi-database text-xl"></i>
+          <p class="text-xs">Chưa có dữ liệu</p>
         </div>
-      </div>
+
+        <!-- Footer secondary stats -->
+        <footer
+          v-if="hasData(wallet.address) && !loadingWallets.has(wallet.address)"
+          class="flex items-center justify-between px-4 py-2.5 bg-zinc-900/40 border-t border-zinc-700/60 text-xs"
+        >
+          <div class="flex items-center gap-3 text-zinc-400">
+            <span class="flex items-center gap-1">
+              <span class="text-zinc-500">Phí:</span>
+              <span
+                class="font-medium tabular-nums"
+                :class="
+                  getWalletStats(wallet.address).totalFee >= 0
+                    ? 'text-emerald-400'
+                    : 'text-rose-400'
+                "
+              >
+                {{ formatNumber(getWalletStats(wallet.address).totalFee) }}
+              </span>
+            </span>
+            <span class="text-zinc-700">·</span>
+            <span class="text-zinc-400">
+              <span class="font-medium text-zinc-200 tabular-nums">{{
+                getWalletStats(wallet.address).transactionsCount
+              }}</span>
+              giao dịch
+            </span>
+          </div>
+          <span
+            class="text-zinc-500 group-hover:text-emerald-400 transition flex items-center gap-1"
+          >
+            Chi tiết
+            <i class="pi pi-arrow-right text-[10px]"></i>
+          </span>
+        </footer>
+      </article>
     </div>
 
     <!-- History dialog -->
@@ -448,7 +561,7 @@ function batchImportWallets() {
       <div v-if="activeWalletAddress" class="overflow-x-auto -mx-1">
         <table class="w-full text-sm min-w-[640px]">
           <thead>
-            <tr class="text-left text-xs text-zinc-500 uppercase tracking-wide">
+            <tr class="text-left text-[11px] text-zinc-500 uppercase tracking-wider">
               <th class="px-3 py-2 font-medium w-10">#</th>
               <th class="px-3 py-2 font-medium">Hash</th>
               <th class="px-3 py-2 font-medium">Thời gian</th>
@@ -463,7 +576,7 @@ function batchImportWallets() {
               :key="tx.hash"
               class="border-t border-zinc-700 hover:bg-zinc-700/30 transition"
             >
-              <td class="px-3 py-3 text-zinc-500">
+              <td class="px-3 py-3 text-zinc-500 tabular-nums">
                 {{ transactionsByWallet[activeWalletAddress].length - i }}
               </td>
               <td class="px-3 py-3">
@@ -490,7 +603,7 @@ function batchImportWallets() {
               </td>
               <td class="px-3 py-3">
                 <div class="leading-tight">
-                  <p class="font-semibold text-emerald-400">
+                  <p class="font-semibold text-emerald-400 tabular-nums">
                     {{ formatNumber(tx.from.amount, { maximumFractionDigits: 6 }) }}
                   </p>
                   <p class="text-xs text-zinc-400 mt-0.5">
@@ -503,7 +616,7 @@ function batchImportWallets() {
               </td>
               <td class="px-3 py-3">
                 <div class="leading-tight">
-                  <p class="font-semibold text-emerald-400">
+                  <p class="font-semibold text-emerald-400 tabular-nums">
                     {{ formatNumber(tx.to.amount, { maximumFractionDigits: 6 }) }}
                   </p>
                   <p class="text-xs text-zinc-400 mt-0.5">
@@ -515,7 +628,7 @@ function batchImportWallets() {
                 </div>
               </td>
               <td class="px-3 py-3 whitespace-nowrap">
-                <span class="text-zinc-300">{{ tx.gas }}</span>
+                <span class="text-zinc-300 tabular-nums">{{ tx.gas }}</span>
                 <span class="text-xs text-zinc-600 ml-1">BNB</span>
               </td>
             </tr>
@@ -561,7 +674,7 @@ function batchImportWallets() {
         </h3>
         <p class="text-xs text-zinc-500 mb-2">
           Mỗi dòng theo format:
-          <code class="text-zinc-300 bg-zinc-900 px-1.5 py-0.5 rounded">0xABC..., Label</code>
+          <code class="text-zinc-300 bg-zinc-800 px-1.5 py-0.5 rounded">0xABC..., Label</code>
         </p>
         <textarea
           v-model="batchImportText"
@@ -599,6 +712,10 @@ function batchImportWallets() {
                 <i
                   class="pi pi-arrows-alt handle text-zinc-600 hover:text-zinc-300 cursor-grab active:cursor-grabbing text-sm shrink-0"
                 ></i>
+                <div
+                  class="w-7 h-7 rounded-md shrink-0"
+                  :style="{ background: addressGradient(element.address) }"
+                ></div>
                 <div class="min-w-0">
                   <p class="font-semibold text-zinc-100 text-sm truncate">
                     {{ element.label }}
