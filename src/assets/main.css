@@ -1,1 +1,35 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+
+html,
+body {
+  background-color: #18181b;
+  color: #e4e4e7;
+  min-height: 100vh;
+}
+
+body {
+  background-image:
+    radial-gradient(at 20% 0%, rgba(16, 185, 129, 0.12), transparent 55%),
+    radial-gradient(at 80% 0%, rgba(59, 130, 246, 0.1), transparent 55%);
+  background-attachment: fixed;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #18181b;
+}
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  cursor: pointer;
+}

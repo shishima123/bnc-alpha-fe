@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(node -e \"console.log\\(typeof localStorage\\); console.log\\(localStorage\\);\")",
+      "Bash(node -e \"console.log\\(typeof localStorage\\); console.log\\(Object.keys\\(localStorage\\)\\); console.log\\(typeof localStorage.getItem\\);\")",
+      "Bash(node --stack-trace-limit=100 -e \"import\\('./vite.config.ts'\\).catch\\(e => console.error\\(e.stack\\)\\)\")"
+    ]
+  }
+}
