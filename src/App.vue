@@ -247,22 +247,22 @@ function batchImportWallets() {
 <template>
   <!-- Sticky top bar -->
   <header
-    class="sticky top-0 z-30 bg-zinc-900/80 backdrop-blur-md border-b border-zinc-800"
+    class="sticky top-0 z-30 bg-slate-800/80 backdrop-blur-md border-b border-slate-700"
   >
     <div
       class="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center gap-2 sm:gap-3"
     >
       <div class="flex items-center gap-2.5 min-w-0 mr-auto">
         <div
-          class="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center font-bold text-zinc-900 shadow-lg shadow-emerald-500/20 shrink-0"
+          class="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center font-bold text-slate-900 shadow-lg shadow-emerald-500/20 shrink-0"
         >
           α
         </div>
         <div class="min-w-0">
-          <h1 class="font-semibold text-zinc-100 text-sm sm:text-base leading-tight">
-            Alpha Tracker
+          <h1 class="font-semibold text-slate-100 text-sm sm:text-base leading-tight">
+            Web3 Wallet Tracker
           </h1>
-          <p class="text-xs text-zinc-500 hidden sm:block leading-tight">
+          <p class="text-xs text-slate-400 hidden sm:block leading-tight">
             Binance Alpha · BSC
           </p>
         </div>
@@ -271,19 +271,19 @@ function batchImportWallets() {
       <!-- Date -->
       <div class="relative">
         <i
-          class="pi pi-calendar absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm pointer-events-none"
+          class="pi pi-calendar absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"
         ></i>
         <input
           type="date"
           v-model="selectedDate"
-          class="bg-zinc-800/60 border border-zinc-700 rounded-lg pl-9 pr-2.5 py-2 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 transition"
+          class="bg-slate-700/60 border border-slate-600 rounded-lg pl-9 pr-2.5 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 transition"
         />
       </div>
 
       <!-- Manage -->
       <button
         @click="shouldShowWalletModal = true"
-        class="flex items-center justify-center gap-2 bg-zinc-800/60 hover:bg-zinc-700 border border-zinc-700 hover:border-zinc-600 rounded-lg px-3 py-2 text-sm text-zinc-100 transition"
+        class="flex items-center justify-center gap-2 bg-slate-700/60 hover:bg-slate-600 border border-slate-600 hover:border-slate-500 rounded-lg px-3 py-2 text-sm text-slate-100 transition"
         title="Quản lý ví"
       >
         <i class="pi pi-cog text-sm"></i>
@@ -295,7 +295,7 @@ function batchImportWallets() {
         <button
           @click="fetchDataAll"
           :disabled="isLoadingResult"
-          class="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-zinc-900 font-semibold rounded-l-lg px-3 py-2 text-sm transition shadow-lg shadow-emerald-500/20"
+          class="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-slate-900 font-semibold rounded-l-lg px-3 py-2 text-sm transition shadow-lg shadow-emerald-500/20"
         >
           <i
             class="pi pi-sync text-sm"
@@ -306,7 +306,7 @@ function batchImportWallets() {
         <button
           @click="showCheckMenu = !showCheckMenu"
           :disabled="isLoadingResult"
-          class="flex items-center justify-center bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-zinc-900 rounded-r-lg px-2 py-2 border-l border-emerald-700 transition"
+          class="flex items-center justify-center bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-slate-900 rounded-r-lg px-2 py-2 border-l border-emerald-700 transition"
           aria-label="More options"
         >
           <i class="pi pi-chevron-down text-xs"></i>
@@ -315,11 +315,11 @@ function batchImportWallets() {
         <transition name="dropdown">
           <div
             v-if="showCheckMenu"
-            class="absolute right-0 top-full mt-2 w-72 bg-zinc-800 border border-zinc-700 rounded-xl shadow-2xl overflow-hidden z-30"
+            class="absolute right-0 top-full mt-2 w-72 bg-slate-700 border border-slate-600 rounded-xl shadow-2xl overflow-hidden z-30"
           >
             <button
               @click="fetchDataMissingOnly"
-              class="w-full flex items-center gap-2 px-4 py-3 text-sm text-zinc-200 hover:bg-zinc-700 transition text-left"
+              class="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-200 hover:bg-slate-600 transition text-left"
             >
               <i class="pi pi-filter text-emerald-400 text-sm"></i>
               <span>Chỉ kiểm tra ví chưa có kết quả</span>
@@ -335,14 +335,14 @@ function batchImportWallets() {
     <!-- Summary pill -->
     <div
       v-if="totals.total > 0"
-      class="inline-flex items-center gap-2 bg-zinc-800/60 border border-zinc-700 px-3.5 py-1.5 rounded-full text-sm text-zinc-300 mb-6"
+      class="inline-flex items-center gap-2 bg-slate-700/60 border border-slate-600 px-3.5 py-1.5 rounded-full text-sm text-slate-300 mb-6"
     >
       <i class="pi pi-chart-bar text-emerald-400 text-sm"></i>
       <span>
         Đã có dữ liệu:
         <span class="font-semibold text-emerald-400 tabular-nums">{{ totals.withData }}</span>
-        <span class="text-zinc-500 mx-0.5">/</span>
-        <span class="font-semibold text-zinc-100 tabular-nums">{{ totals.total }}</span> ví
+        <span class="text-slate-400 mx-0.5">/</span>
+        <span class="font-semibold text-slate-100 tabular-nums">{{ totals.total }}</span> ví
       </span>
     </div>
 
@@ -352,15 +352,15 @@ function batchImportWallets() {
       class="flex flex-col items-center justify-center py-24 text-center"
     >
       <div
-        class="w-16 h-16 rounded-2xl bg-zinc-800/60 border border-zinc-700 flex items-center justify-center mb-4"
+        class="w-16 h-16 rounded-2xl bg-slate-700/60 border border-slate-600 flex items-center justify-center mb-4"
       >
-        <i class="pi pi-wallet text-2xl text-zinc-600"></i>
+        <i class="pi pi-wallet text-2xl text-slate-500"></i>
       </div>
-      <h3 class="text-lg font-semibold text-zinc-200 mb-1">Chưa có ví nào</h3>
-      <p class="text-sm text-zinc-500 mb-5">Thêm ví đầu tiên để bắt đầu theo dõi</p>
+      <h3 class="text-lg font-semibold text-slate-200 mb-1">Chưa có ví nào</h3>
+      <p class="text-sm text-slate-400 mb-5">Thêm ví đầu tiên để bắt đầu theo dõi</p>
       <button
         @click="shouldShowWalletModal = true"
-        class="bg-emerald-500 hover:bg-emerald-400 text-zinc-900 font-semibold rounded-xl px-5 py-2.5 text-sm transition"
+        class="bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-semibold rounded-xl px-5 py-2.5 text-sm transition"
       >
         Thêm ví
       </button>
@@ -371,9 +371,9 @@ function batchImportWallets() {
       <article
         v-for="wallet in wallets"
         :key="wallet.address"
-        class="group bg-zinc-800/50 border border-zinc-700 rounded-2xl overflow-hidden transition shadow-lg shadow-black/20"
+        class="group bg-slate-700/50 border border-slate-600 rounded-2xl overflow-hidden transition shadow-lg shadow-black/20"
         :class="{
-          'hover:border-zinc-600 hover:shadow-emerald-500/5 cursor-pointer': hasData(
+          'hover:border-slate-500 hover:shadow-emerald-500/5 cursor-pointer': hasData(
             wallet.address,
           ),
         }"
@@ -381,20 +381,20 @@ function batchImportWallets() {
       >
         <!-- Card header -->
         <header
-          class="flex items-center justify-between px-4 py-3 border-b border-zinc-700/60"
+          class="flex items-center justify-between px-4 py-3 border-b border-slate-600/60"
         >
           <div class="min-w-0">
-            <h3 class="font-semibold text-zinc-100 text-sm truncate">
+            <h3 class="font-semibold text-slate-100 text-sm truncate">
               {{ wallet.label }}
             </h3>
-            <p class="text-[11px] font-mono text-zinc-500 truncate">
+            <p class="text-[11px] font-mono text-slate-400 truncate">
               {{ useShortenAddress(wallet.address) }}
             </p>
           </div>
           <button
             @click.stop="fetchDataForWallet(wallet.address)"
             :disabled="isLoadingResult || loadingWallets.has(wallet.address)"
-            class="text-zinc-500 hover:text-emerald-400 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed w-8 h-8 rounded-lg flex items-center justify-center transition shrink-0"
+            class="text-slate-400 hover:text-emerald-400 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed w-8 h-8 rounded-lg flex items-center justify-center transition shrink-0"
             title="Reload ví này"
           >
             <i
@@ -407,28 +407,28 @@ function batchImportWallets() {
         <!-- Loading -->
         <div
           v-if="isLoadingResult || loadingWallets.has(wallet.address)"
-          class="grid grid-cols-2 divide-x divide-zinc-700/60"
+          class="grid grid-cols-2 divide-x divide-slate-600/60"
         >
           <div class="p-5 text-center">
-            <div class="h-8 w-24 mx-auto rounded-md bg-zinc-700 animate-pulse"></div>
-            <div class="h-3 w-16 mx-auto mt-2 rounded bg-zinc-700/60 animate-pulse"></div>
+            <div class="h-8 w-24 mx-auto rounded-md bg-slate-600 animate-pulse"></div>
+            <div class="h-3 w-16 mx-auto mt-2 rounded bg-slate-600/60 animate-pulse"></div>
           </div>
           <div class="p-5 text-center">
-            <div class="h-8 w-12 mx-auto rounded-md bg-zinc-700 animate-pulse"></div>
-            <div class="h-3 w-12 mx-auto mt-2 rounded bg-zinc-700/60 animate-pulse"></div>
+            <div class="h-8 w-12 mx-auto rounded-md bg-slate-600 animate-pulse"></div>
+            <div class="h-3 w-12 mx-auto mt-2 rounded bg-slate-600/60 animate-pulse"></div>
           </div>
         </div>
 
         <!-- Hero stats -->
         <div
           v-else-if="hasData(wallet.address)"
-          class="grid grid-cols-2 divide-x divide-zinc-700/60"
+          class="grid grid-cols-2 divide-x divide-slate-600/60"
         >
           <div class="p-5 text-center">
-            <div class="text-2xl sm:text-[26px] font-bold text-zinc-100 tabular-nums">
+            <div class="text-2xl sm:text-[26px] font-bold text-slate-100 tabular-nums">
               ${{ formatNumber(getWalletStats(wallet.address).totalVolumeUSD) }}
             </div>
-            <div class="text-[11px] uppercase tracking-wider text-zinc-500 mt-1 font-medium">
+            <div class="text-[11px] uppercase tracking-wider text-slate-400 mt-1 font-medium">
               Khối lượng
             </div>
           </div>
@@ -438,7 +438,7 @@ function batchImportWallets() {
             >
               {{ getWalletStats(wallet.address).points }}
             </div>
-            <div class="text-[11px] uppercase tracking-wider text-zinc-500 mt-1 font-medium">
+            <div class="text-[11px] uppercase tracking-wider text-slate-400 mt-1 font-medium">
               Điểm
             </div>
           </div>
@@ -447,7 +447,7 @@ function batchImportWallets() {
         <!-- No data -->
         <div
           v-else
-          class="flex flex-col items-center justify-center py-7 text-zinc-600 gap-1.5"
+          class="flex flex-col items-center justify-center py-7 text-slate-500 gap-1.5"
         >
           <i class="pi pi-database text-xl"></i>
           <p class="text-xs">Chưa có dữ liệu</p>
@@ -456,11 +456,11 @@ function batchImportWallets() {
         <!-- Footer secondary stats -->
         <footer
           v-if="hasData(wallet.address) && !loadingWallets.has(wallet.address)"
-          class="flex items-center justify-between px-4 py-2.5 bg-zinc-900/40 border-t border-zinc-700/60 text-xs"
+          class="flex items-center justify-between px-4 py-2.5 bg-slate-800/40 border-t border-slate-600/60 text-xs"
         >
-          <div class="flex items-center gap-3 text-zinc-400">
+          <div class="flex items-center gap-3 text-slate-400">
             <span class="flex items-center gap-1">
-              <span class="text-zinc-500">Phí:</span>
+              <span class="text-slate-400">Phí:</span>
               <span
                 class="font-medium tabular-nums"
                 :class="
@@ -472,16 +472,16 @@ function batchImportWallets() {
                 {{ formatNumber(getWalletStats(wallet.address).totalFee) }}
               </span>
             </span>
-            <span class="text-zinc-700">·</span>
-            <span class="text-zinc-400">
-              <span class="font-medium text-zinc-200 tabular-nums">{{
+            <span class="text-slate-600">·</span>
+            <span class="text-slate-400">
+              <span class="font-medium text-slate-200 tabular-nums">{{
                 getWalletStats(wallet.address).transactionsCount
               }}</span>
               giao dịch
             </span>
           </div>
           <span
-            class="text-zinc-500 group-hover:text-emerald-400 transition flex items-center gap-1"
+            class="text-slate-400 group-hover:text-emerald-400 transition flex items-center gap-1"
           >
             Chi tiết
             <i class="pi pi-arrow-right text-[10px]"></i>
@@ -495,7 +495,7 @@ function batchImportWallets() {
       <div v-if="activeWalletAddress" class="overflow-x-auto -mx-1">
         <table class="w-full text-sm min-w-[640px]">
           <thead>
-            <tr class="text-left text-[11px] text-zinc-500 uppercase tracking-wider">
+            <tr class="text-left text-[11px] text-slate-400 uppercase tracking-wider">
               <th class="px-3 py-2 font-medium w-10">#</th>
               <th class="px-3 py-2 font-medium">Hash</th>
               <th class="px-3 py-2 font-medium">Thời gian</th>
@@ -508,21 +508,21 @@ function batchImportWallets() {
             <tr
               v-for="(tx, i) in transactionsByWallet[activeWalletAddress]"
               :key="tx.hash"
-              class="border-t border-zinc-700 hover:bg-zinc-700/30 transition"
+              class="border-t border-slate-600 hover:bg-slate-600/30 transition"
             >
-              <td class="px-3 py-3 text-zinc-500 tabular-nums">
+              <td class="px-3 py-3 text-slate-400 tabular-nums">
                 {{ transactionsByWallet[activeWalletAddress].length - i }}
               </td>
               <td class="px-3 py-3">
                 <div class="flex items-center gap-1.5">
-                  <span class="font-mono text-xs text-zinc-300">{{
+                  <span class="font-mono text-xs text-slate-300">{{
                     useShortenAddress(tx.hash)
                   }}</span>
                   <a
                     :href="bscScanTxUrl(tx.hash)"
                     target="_blank"
                     rel="noopener"
-                    class="text-zinc-500 hover:text-emerald-400 transition"
+                    class="text-slate-400 hover:text-emerald-400 transition"
                     title="View on BscScan"
                   >
                     <i class="pi pi-external-link text-[10px]"></i>
@@ -530,7 +530,7 @@ function batchImportWallets() {
                 </div>
               </td>
               <td
-                class="px-3 py-3 whitespace-nowrap text-zinc-300"
+                class="px-3 py-3 whitespace-nowrap text-slate-300"
                 :title="moment.unix(tx.timestamp).local().format('YYYY-MM-DD HH:mm:ss')"
               >
                 {{ moment.unix(tx.timestamp).fromNow() }}
@@ -540,9 +540,9 @@ function batchImportWallets() {
                   <p class="font-semibold text-emerald-400 tabular-nums">
                     {{ formatNumber(tx.from.amount, { maximumFractionDigits: 6 }) }}
                   </p>
-                  <p class="text-xs text-zinc-400 mt-0.5">
+                  <p class="text-xs text-slate-400 mt-0.5">
                     <span class="mr-1.5">{{ tx.from.symbol }}</span>
-                    <span class="font-mono text-zinc-600">{{
+                    <span class="font-mono text-slate-500">{{
                       useShortenAddress(tx.from.address)
                     }}</span>
                   </p>
@@ -553,17 +553,17 @@ function batchImportWallets() {
                   <p class="font-semibold text-emerald-400 tabular-nums">
                     {{ formatNumber(tx.to.amount, { maximumFractionDigits: 6 }) }}
                   </p>
-                  <p class="text-xs text-zinc-400 mt-0.5">
+                  <p class="text-xs text-slate-400 mt-0.5">
                     <span class="mr-1.5">{{ tx.to.symbol }}</span>
-                    <span class="font-mono text-zinc-600">{{
+                    <span class="font-mono text-slate-500">{{
                       useShortenAddress(tx.to.address)
                     }}</span>
                   </p>
                 </div>
               </td>
               <td class="px-3 py-3 whitespace-nowrap">
-                <span class="text-zinc-300 tabular-nums">{{ tx.gas }}</span>
-                <span class="text-xs text-zinc-600 ml-1">BNB</span>
+                <span class="text-slate-300 tabular-nums">{{ tx.gas }}</span>
+                <span class="text-xs text-slate-500 ml-1">BNB</span>
               </td>
             </tr>
           </tbody>
@@ -573,42 +573,46 @@ function batchImportWallets() {
 
     <!-- Wallet management dialog with tabs -->
     <AppModal v-model:visible="shouldShowWalletModal" title="Quản lý địa chỉ ví" width="44rem">
-      <!-- Tabs -->
-      <div class="flex gap-1 border-b border-zinc-700 mb-5 -mx-1 px-1 overflow-x-auto">
-        <button
-          @click="walletTab = 'list'"
-          :class="[
-            'px-4 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 -mb-px transition',
-            walletTab === 'list'
-              ? 'border-emerald-400 text-emerald-400'
-              : 'border-transparent text-zinc-500 hover:text-zinc-300',
-          ]"
+      <!-- Tabs (pinned outside scroll area) -->
+      <template #sub-header>
+        <div
+          class="flex gap-1 border-b border-slate-600 px-5 sm:px-6 overflow-x-auto shrink-0 overflow-y-hidden"
         >
-          Danh sách ({{ wallets.length }})
-        </button>
-        <button
-          @click="walletTab = 'add'"
-          :class="[
-            'px-4 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 -mb-px transition',
-            walletTab === 'add'
-              ? 'border-emerald-400 text-emerald-400'
-              : 'border-transparent text-zinc-500 hover:text-zinc-300',
-          ]"
-        >
-          Thêm ví
-        </button>
-        <button
-          @click="walletTab = 'import'"
-          :class="[
-            'px-4 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 -mb-px transition',
-            walletTab === 'import'
-              ? 'border-emerald-400 text-emerald-400'
-              : 'border-transparent text-zinc-500 hover:text-zinc-300',
-          ]"
-        >
-          Import Hàng loạt
-        </button>
-      </div>
+          <button
+            @click="walletTab = 'list'"
+            :class="[
+              'px-4 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 -mb-px transition',
+              walletTab === 'list'
+                ? 'border-emerald-400 text-emerald-400'
+                : 'border-transparent text-slate-400 hover:text-slate-300',
+            ]"
+          >
+            Danh sách ({{ wallets.length }})
+          </button>
+          <button
+            @click="walletTab = 'add'"
+            :class="[
+              'px-4 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 -mb-px transition',
+              walletTab === 'add'
+                ? 'border-emerald-400 text-emerald-400'
+                : 'border-transparent text-slate-400 hover:text-slate-300',
+            ]"
+          >
+            Thêm ví
+          </button>
+          <button
+            @click="walletTab = 'import'"
+            :class="[
+              'px-4 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 -mb-px transition',
+              walletTab === 'import'
+                ? 'border-emerald-400 text-emerald-400'
+                : 'border-transparent text-slate-400 hover:text-slate-300',
+            ]"
+          >
+            Import Hàng loạt
+          </button>
+        </div>
+      </template>
 
       <!-- Tab: List -->
       <div v-if="walletTab === 'list'">
@@ -621,24 +625,24 @@ function batchImportWallets() {
         >
           <template #item="{ element, index }">
             <li
-              class="group flex items-center justify-between bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700 hover:border-zinc-600 rounded-xl px-4 py-3 cursor-grab active:cursor-grabbing transition"
+              class="group flex items-center justify-between bg-slate-700/60 hover:bg-slate-700 border border-slate-600 hover:border-slate-500 rounded-xl px-4 py-3 cursor-grab active:cursor-grabbing transition"
             >
               <div class="min-w-0 flex-1">
                 <div class="flex items-baseline gap-2">
-                  <span class="text-zinc-500 text-sm font-medium tabular-nums shrink-0">
+                  <span class="text-slate-400 text-sm font-medium tabular-nums shrink-0">
                     {{ index + 1 }}.
                   </span>
-                  <p class="font-semibold text-zinc-100 text-sm truncate">
+                  <p class="font-semibold text-slate-100 text-sm truncate">
                     {{ element.label }}
                   </p>
                 </div>
-                <p class="text-xs font-mono text-zinc-500 truncate mt-1 ml-5">
+                <p class="text-xs font-mono text-slate-400 truncate mt-1 ml-5">
                   {{ element.address }}
                 </p>
               </div>
               <button
                 @click.stop="wallets.splice(index, 1)"
-                class="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 w-8 h-8 rounded-lg flex items-center justify-center transition shrink-0 ml-2"
+                class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 w-8 h-8 rounded-lg flex items-center justify-center transition shrink-0 ml-2"
                 title="Xóa"
               >
                 <i class="pi pi-trash text-sm"></i>
@@ -648,9 +652,9 @@ function batchImportWallets() {
         </draggable>
         <div
           v-else
-          class="flex flex-col items-center justify-center py-12 text-center text-zinc-500"
+          class="flex flex-col items-center justify-center py-12 text-center text-slate-400"
         >
-          <i class="pi pi-inbox text-3xl mb-3 text-zinc-600"></i>
+          <i class="pi pi-inbox text-3xl mb-3 text-slate-500"></i>
           <p class="text-sm">Chưa có ví nào trong danh sách</p>
           <button
             @click="walletTab = 'add'"
@@ -664,27 +668,27 @@ function batchImportWallets() {
       <!-- Tab: Add -->
       <div v-else-if="walletTab === 'add'" class="flex flex-col gap-3">
         <div>
-          <label class="block text-xs text-zinc-400 mb-1.5 font-medium">Địa chỉ ví</label>
+          <label class="block text-xs text-slate-400 mb-1.5 font-medium">Địa chỉ ví</label>
           <input
             v-model="newWalletAddress"
             placeholder="0x..."
-            class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 transition font-mono"
+            class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 transition font-mono"
           />
         </div>
         <div>
-          <label class="block text-xs text-zinc-400 mb-1.5 font-medium">
-            Ghi chú <span class="text-zinc-600">(tùy chọn)</span>
+          <label class="block text-xs text-slate-400 mb-1.5 font-medium">
+            Ghi chú <span class="text-slate-500">(tùy chọn)</span>
           </label>
           <input
             v-model="newWalletLabel"
             placeholder="VD: Ví chính"
-            class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 transition"
+            class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 transition"
             @keyup.enter="addWallet"
           />
         </div>
         <button
           @click="addWallet"
-          class="bg-emerald-500 hover:bg-emerald-400 text-zinc-900 font-semibold rounded-lg py-2.5 text-sm transition mt-1"
+          class="bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-semibold rounded-lg py-2.5 text-sm transition mt-1"
         >
           Thêm ví
         </button>
@@ -692,21 +696,21 @@ function batchImportWallets() {
 
       <!-- Tab: Import -->
       <div v-else-if="walletTab === 'import'" class="flex flex-col gap-3">
-        <p class="text-xs text-zinc-400">
+        <p class="text-xs text-slate-400">
           Nhập nhiều ví, mỗi dòng theo format:
-          <code class="text-zinc-300 bg-zinc-800 px-1.5 py-0.5 rounded font-mono">
+          <code class="text-slate-300 bg-slate-700 px-1.5 py-0.5 rounded font-mono">
             0xABC..., Label
           </code>
         </p>
         <textarea
           v-model="batchImportText"
           rows="8"
-          class="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 transition font-mono resize-y"
+          class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 transition font-mono resize-y"
           placeholder="0xB2AD50f4AB1B7A9DB6069ca4761E6d250BA146E3, TK1&#10;0x5246AcC8e6993F881638FE82164d50eFCFa9fb1E, TK2"
         ></textarea>
         <button
           @click="batchImportWallets"
-          class="bg-emerald-500 hover:bg-emerald-400 text-zinc-900 font-semibold rounded-lg py-2.5 text-sm transition"
+          class="bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-semibold rounded-lg py-2.5 text-sm transition"
         >
           Import
         </button>
@@ -715,7 +719,7 @@ function batchImportWallets() {
       <template #footer>
         <button
           @click="shouldShowWalletModal = false"
-          class="w-full sm:w-auto bg-zinc-800 hover:bg-zinc-700 text-zinc-100 rounded-lg px-5 py-2 text-sm font-medium transition"
+          class="w-full sm:w-auto bg-slate-700 hover:bg-slate-600 text-slate-100 rounded-lg px-5 py-2 text-sm font-medium transition"
         >
           Hoàn Thành
         </button>

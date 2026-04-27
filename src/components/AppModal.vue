@@ -38,29 +38,30 @@ function handleKey(e: KeyboardEvent) {
     >
       <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" @click="close" />
       <div
-        class="relative w-full bg-zinc-800/95 border border-zinc-700 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+        class="relative w-full bg-slate-700/95 border border-slate-600 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
         :style="{ maxWidth: width || '40rem' }"
       >
         <header
-          class="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-zinc-700 shrink-0"
+          class="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-600 shrink-0"
         >
-          <h2 class="text-base sm:text-lg font-semibold text-zinc-100">
+          <h2 class="text-base sm:text-lg font-semibold text-slate-100">
             {{ title }}
           </h2>
           <button
-            class="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700 transition rounded-lg w-8 h-8 flex items-center justify-center"
+            class="text-slate-300 hover:text-slate-100 hover:bg-slate-600 transition rounded-lg w-8 h-8 flex items-center justify-center"
             @click="close"
             aria-label="Close"
           >
             <i class="pi pi-times text-sm"></i>
           </button>
         </header>
+        <slot name="sub-header" />
         <div class="overflow-y-auto px-5 sm:px-6 py-5">
           <slot />
         </div>
         <footer
           v-if="$slots.footer"
-          class="flex items-center justify-end gap-2 px-5 sm:px-6 py-4 border-t border-zinc-700 shrink-0"
+          class="flex items-center justify-end gap-2 px-5 sm:px-6 py-4 border-t border-slate-600 shrink-0"
         >
           <slot name="footer" />
         </footer>
