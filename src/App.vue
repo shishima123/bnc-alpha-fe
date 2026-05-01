@@ -366,128 +366,120 @@ function batchImportWallets() {
       </button>
     </div>
 
-    <!-- Wallet grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      <article
-        v-for="wallet in wallets"
-        :key="wallet.address"
-        class="group bg-slate-700/50 border border-slate-600 rounded-2xl overflow-hidden transition shadow-lg shadow-black/20"
-        :class="{
-          'hover:border-slate-500 hover:shadow-emerald-500/5 cursor-pointer': hasData(
-            wallet.address,
-          ),
-        }"
-        @click="openHistory(wallet.address)"
-      >
-        <!-- Card header -->
-        <header
-          class="flex items-center justify-between px-4 py-3 border-b border-slate-600/60"
-        >
-          <div class="min-w-0">
-            <h3 class="font-semibold text-slate-100 text-sm truncate">
-              {{ wallet.label }}
-            </h3>
-            <p class="text-[11px] font-mono text-slate-400 truncate">
-              {{ useShortenAddress(wallet.address) }}
-            </p>
-          </div>
-          <button
-            @click.stop="fetchDataForWallet(wallet.address)"
-            :disabled="isLoadingResult || loadingWallets.has(wallet.address)"
-            class="text-slate-400 hover:text-emerald-400 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed w-8 h-8 rounded-lg flex items-center justify-center transition shrink-0"
-            title="Reload ví này"
-          >
-            <i
-              class="pi pi-refresh text-sm"
-              :class="{ 'animate-spin': loadingWallets.has(wallet.address) }"
-            ></i>
-          </button>
-        </header>
-
-        <!-- Loading -->
-        <div
-          v-if="isLoadingResult || loadingWallets.has(wallet.address)"
-          class="grid grid-cols-2 divide-x divide-slate-600/60"
-        >
-          <div class="p-5 text-center">
-            <div class="h-8 w-24 mx-auto rounded-md bg-slate-600 animate-pulse"></div>
-            <div class="h-3 w-16 mx-auto mt-2 rounded bg-slate-600/60 animate-pulse"></div>
-          </div>
-          <div class="p-5 text-center">
-            <div class="h-8 w-12 mx-auto rounded-md bg-slate-600 animate-pulse"></div>
-            <div class="h-3 w-12 mx-auto mt-2 rounded bg-slate-600/60 animate-pulse"></div>
-          </div>
-        </div>
-
-        <!-- Hero stats -->
-        <div
-          v-else-if="hasData(wallet.address)"
-          class="grid grid-cols-2 divide-x divide-slate-600/60"
-        >
-          <div class="p-5 text-center">
-            <div class="text-2xl sm:text-[26px] font-bold text-slate-100 tabular-nums">
-              ${{ formatNumber(getWalletStats(wallet.address).totalVolumeUSD) }}
-            </div>
-            <div class="text-[11px] uppercase tracking-wider text-slate-400 mt-1 font-medium">
-              Khối lượng
-            </div>
-          </div>
-          <div class="p-5 text-center">
-            <div
-              class="text-2xl sm:text-[26px] font-bold text-emerald-400 tabular-nums"
+    <!-- Wallet table -->
+    <div
+      v-if="totals.total > 0"
+      class="bg-slate-700/40 border border-slate-600 rounded-xl overflow-hidden shadow-lg shadow-black/20"
+    >
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm min-w-[760px]">
+          <thead class="bg-slate-800/60">
+            <tr class="text-left text-[11px] text-slate-400 uppercase tracking-wider">
+              <th class="px-3 py-2.5 font-medium w-10">#</th>
+              <th class="px-3 py-2.5 font-medium">Ví</th>
+              <th class="px-3 py-2.5 font-medium text-right">Khối lượng</th>
+              <th class="px-3 py-2.5 font-medium text-right">Điểm</th>
+              <th class="px-3 py-2.5 font-medium text-right">Phí</th>
+              <th class="px-3 py-2.5 font-medium text-right">Giao dịch</th>
+              <th class="px-3 py-2.5 font-medium w-24 text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="(wallet, idx) in wallets"
+              :key="wallet.address"
+              class="border-t border-slate-600/60 transition"
+              :class="{
+                'hover:bg-slate-600/30 cursor-pointer': hasData(wallet.address),
+              }"
+              @click="openHistory(wallet.address)"
             >
-              {{ getWalletStats(wallet.address).points }}
-            </div>
-            <div class="text-[11px] uppercase tracking-wider text-slate-400 mt-1 font-medium">
-              Điểm
-            </div>
-          </div>
-        </div>
+              <td class="px-3 py-3 text-slate-400 tabular-nums">{{ idx + 1 }}</td>
+              <td class="px-3 py-3">
+                <div class="leading-tight min-w-0">
+                  <p class="font-semibold text-slate-100 text-sm truncate">
+                    {{ wallet.label }}
+                  </p>
+                  <p class="text-[11px] font-mono text-slate-400 truncate mt-0.5">
+                    {{ useShortenAddress(wallet.address) }}
+                  </p>
+                </div>
+              </td>
 
-        <!-- No data -->
-        <div
-          v-else
-          class="flex flex-col items-center justify-center py-7 text-slate-500 gap-1.5"
-        >
-          <i class="pi pi-database text-xl"></i>
-          <p class="text-xs">Chưa có dữ liệu</p>
-        </div>
+              <!-- Loading row -->
+              <template v-if="isLoadingResult || loadingWallets.has(wallet.address)">
+                <td class="px-3 py-3 text-right">
+                  <div class="h-4 w-20 ml-auto rounded bg-slate-600 animate-pulse"></div>
+                </td>
+                <td class="px-3 py-3 text-right">
+                  <div class="h-4 w-10 ml-auto rounded bg-slate-600 animate-pulse"></div>
+                </td>
+                <td class="px-3 py-3 text-right">
+                  <div class="h-4 w-12 ml-auto rounded bg-slate-600 animate-pulse"></div>
+                </td>
+                <td class="px-3 py-3 text-right">
+                  <div class="h-4 w-8 ml-auto rounded bg-slate-600 animate-pulse"></div>
+                </td>
+              </template>
 
-        <!-- Footer secondary stats -->
-        <footer
-          v-if="hasData(wallet.address) && !loadingWallets.has(wallet.address)"
-          class="flex items-center justify-between px-4 py-2.5 bg-slate-800/40 border-t border-slate-600/60 text-xs"
-        >
-          <div class="flex items-center gap-3 text-slate-400">
-            <span class="flex items-center gap-1">
-              <span class="text-slate-400">Phí:</span>
-              <span
-                class="font-medium tabular-nums"
-                :class="
-                  getWalletStats(wallet.address).totalFee >= 0
-                    ? 'text-emerald-400'
-                    : 'text-rose-400'
-                "
-              >
-                {{ formatNumber(getWalletStats(wallet.address).totalFee) }}
-              </span>
-            </span>
-            <span class="text-slate-600">·</span>
-            <span class="text-slate-400">
-              <span class="font-medium text-slate-200 tabular-nums">{{
-                getWalletStats(wallet.address).transactionsCount
-              }}</span>
-              giao dịch
-            </span>
-          </div>
-          <span
-            class="text-slate-400 group-hover:text-emerald-400 transition flex items-center gap-1"
-          >
-            Chi tiết
-            <i class="pi pi-arrow-right text-[10px]"></i>
-          </span>
-        </footer>
-      </article>
+              <!-- Data row -->
+              <template v-else-if="hasData(wallet.address)">
+                <td class="px-3 py-3 text-right font-semibold text-slate-100 tabular-nums">
+                  ${{ formatNumber(getWalletStats(wallet.address).totalVolumeUSD) }}
+                </td>
+                <td class="px-3 py-3 text-right font-semibold text-emerald-400 tabular-nums">
+                  {{ getWalletStats(wallet.address).points }}
+                </td>
+                <td
+                  class="px-3 py-3 text-right tabular-nums font-medium"
+                  :class="
+                    getWalletStats(wallet.address).totalFee >= 0
+                      ? 'text-emerald-400'
+                      : 'text-rose-400'
+                  "
+                >
+                  {{ formatNumber(getWalletStats(wallet.address).totalFee) }}
+                </td>
+                <td class="px-3 py-3 text-right text-slate-300 tabular-nums">
+                  {{ getWalletStats(wallet.address).transactionsCount }}
+                </td>
+              </template>
+
+              <!-- Empty row -->
+              <template v-else>
+                <td colspan="4" class="px-3 py-3 text-center text-slate-500 text-xs">
+                  <i class="pi pi-database text-sm mr-1"></i>
+                  Chưa có dữ liệu
+                </td>
+              </template>
+
+              <td class="px-3 py-3 text-right">
+                <div class="flex items-center justify-end gap-1">
+                  <button
+                    @click.stop="fetchDataForWallet(wallet.address)"
+                    :disabled="isLoadingResult || loadingWallets.has(wallet.address)"
+                    class="text-slate-400 hover:text-emerald-400 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed w-8 h-8 rounded-lg flex items-center justify-center transition"
+                    title="Reload ví này"
+                  >
+                    <i
+                      class="pi pi-refresh text-sm"
+                      :class="{ 'animate-spin': loadingWallets.has(wallet.address) }"
+                    ></i>
+                  </button>
+                  <button
+                    v-if="hasData(wallet.address) && !loadingWallets.has(wallet.address)"
+                    @click.stop="openHistory(wallet.address)"
+                    class="text-slate-400 hover:text-emerald-400 hover:bg-slate-600 w-8 h-8 rounded-lg flex items-center justify-center transition"
+                    title="Chi tiết"
+                  >
+                    <i class="pi pi-arrow-right text-sm"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- History dialog -->
