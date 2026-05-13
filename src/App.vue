@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import axiosInstance from '@/apis/http-common.ts'
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed } from 'vue'
 import type { PriceMap, Transaction, Wallet } from '@/types/types'
 import {
   useShortenAddress,
@@ -28,17 +28,7 @@ const shouldShowHistoryDialog = ref(false)
 const activeWalletAddress = ref<string | null>(null)
 const selectedDate = ref<string>(moment(new Date()).format('YYYY-MM-DD'))
 
-const showCheckMenu = ref(false)
-const checkBtnRef = ref<HTMLDivElement | null>(null)
 const walletTab = ref<'list' | 'add' | 'import'>('list')
-
-function handleClickOutside(e: MouseEvent) {
-  if (checkBtnRef.value && !checkBtnRef.value.contains(e.target as Node)) {
-    showCheckMenu.value = false
-  }
-}
-onMounted(() => document.addEventListener('click', handleClickOutside))
-onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 
 function getWalletStats(address: string) {
   const txs = transactionsByWallet.value[address] || []
@@ -88,7 +78,6 @@ function openHistory(address: string) {
 }
 
 async function fetchDataAll() {
-  showCheckMenu.value = false
   if (wallets.value.length === 0) {
     addToast({ severity: 'warn', summary: 'Thông báo', detail: 'Chưa có ví nào được lưu' })
     return
@@ -137,7 +126,6 @@ async function fetchDataForWallet(address: string) {
 }
 
 async function fetchDataMissingOnly() {
-  showCheckMenu.value = false
   const missingWallets = wallets.value
     .filter((w) => !hasData(w.address))
     .map((w) => w.address)
@@ -283,50 +271,35 @@ function batchImportWallets() {
       <!-- Manage -->
       <button
         @click="shouldShowWalletModal = true"
-        class="flex items-center justify-center gap-2 bg-slate-700/60 hover:bg-slate-600 border border-slate-600 hover:border-slate-500 rounded-lg px-3 py-2 text-sm text-slate-100 transition"
+        class="flex items-center justify-center gap-2 bg-slate-700/60 hover:bg-slate-600 border border-slate-600 hover:border-slate-500 rounded-lg px-3 py-2 text-sm text-slate-100 transition cursor-pointer"
         title="Quản lý ví"
       >
         <i class="pi pi-cog text-sm"></i>
         <span class="hidden sm:inline">Quản lý ví</span>
       </button>
 
-      <!-- Run split button -->
-      <div ref="checkBtnRef" class="relative flex">
-        <button
-          @click="fetchDataAll"
-          :disabled="isLoadingResult"
-          class="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-slate-900 font-semibold rounded-l-lg px-3 py-2 text-sm transition shadow-lg shadow-emerald-500/20"
-        >
-          <i
-            class="pi pi-sync text-sm"
-            :class="{ 'animate-spin': isLoadingResult }"
-          ></i>
-          <span>Kiểm tra</span>
-        </button>
-        <button
-          @click="showCheckMenu = !showCheckMenu"
-          :disabled="isLoadingResult"
-          class="flex items-center justify-center bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-slate-900 rounded-r-lg px-2 py-2 border-l border-emerald-700 transition"
-          aria-label="More options"
-        >
-          <i class="pi pi-chevron-down text-xs"></i>
-        </button>
+      <!-- Check buttons -->
+      <button
+        @click="fetchDataMissingOnly"
+        :disabled="isLoadingResult"
+        class="flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-400 disabled:opacity-60 disabled:cursor-not-allowed text-slate-900 font-semibold rounded-lg px-3 py-2 text-sm transition shadow-lg shadow-sky-500/20 cursor-pointer"
+        title="Chỉ kiểm tra ví chưa có kết quả"
+      >
+        <i class="pi pi-bolt text-sm"></i>
+        <span class="hidden sm:inline">KT Ví Còn Lại</span>
+      </button>
 
-        <transition name="dropdown">
-          <div
-            v-if="showCheckMenu"
-            class="absolute right-0 top-full mt-2 w-72 bg-slate-700 border border-slate-600 rounded-xl shadow-2xl overflow-hidden z-30"
-          >
-            <button
-              @click="fetchDataMissingOnly"
-              class="w-full flex items-center gap-2 px-4 py-3 text-sm text-slate-200 hover:bg-slate-600 transition text-left"
-            >
-              <i class="pi pi-filter text-emerald-400 text-sm"></i>
-              <span>Chỉ kiểm tra ví chưa có kết quả</span>
-            </button>
-          </div>
-        </transition>
-      </div>
+      <button
+        @click="fetchDataAll"
+        :disabled="isLoadingResult"
+        class="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-slate-900 font-semibold rounded-lg px-3 py-2 text-sm transition shadow-lg shadow-emerald-500/20 cursor-pointer"
+      >
+        <i
+          class="pi pi-sync text-sm"
+          :class="{ 'animate-spin': isLoadingResult }"
+        ></i>
+        <span>Kiểm tra</span>
+      </button>
     </div>
   </header>
 
@@ -360,7 +333,7 @@ function batchImportWallets() {
       <p class="text-sm text-slate-400 mb-5">Thêm ví đầu tiên để bắt đầu theo dõi</p>
       <button
         @click="shouldShowWalletModal = true"
-        class="bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-semibold rounded-xl px-5 py-2.5 text-sm transition"
+        class="bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-semibold rounded-xl px-5 py-2.5 text-sm transition cursor-pointer"
       >
         Thêm ví
       </button>
@@ -458,7 +431,7 @@ function batchImportWallets() {
                   <button
                     @click.stop="fetchDataForWallet(wallet.address)"
                     :disabled="isLoadingResult || loadingWallets.has(wallet.address)"
-                    class="text-slate-400 hover:text-emerald-400 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed w-8 h-8 rounded-lg flex items-center justify-center transition"
+                    class="text-slate-400 hover:text-emerald-400 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer"
                     title="Reload ví này"
                   >
                     <i
@@ -469,7 +442,7 @@ function batchImportWallets() {
                   <button
                     v-if="hasData(wallet.address) && !loadingWallets.has(wallet.address)"
                     @click.stop="openHistory(wallet.address)"
-                    class="text-slate-400 hover:text-emerald-400 hover:bg-slate-600 w-8 h-8 rounded-lg flex items-center justify-center transition"
+                    class="text-slate-400 hover:text-emerald-400 hover:bg-slate-600 w-8 h-8 rounded-lg flex items-center justify-center transition cursor-pointer"
                     title="Chi tiết"
                   >
                     <i class="pi pi-arrow-right text-sm"></i>
@@ -573,7 +546,7 @@ function batchImportWallets() {
           <button
             @click="walletTab = 'list'"
             :class="[
-              'px-4 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 -mb-px transition',
+              'px-4 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 -mb-px transition cursor-pointer',
               walletTab === 'list'
                 ? 'border-emerald-400 text-emerald-400'
                 : 'border-transparent text-slate-400 hover:text-slate-300',
@@ -584,7 +557,7 @@ function batchImportWallets() {
           <button
             @click="walletTab = 'add'"
             :class="[
-              'px-4 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 -mb-px transition',
+              'px-4 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 -mb-px transition cursor-pointer',
               walletTab === 'add'
                 ? 'border-emerald-400 text-emerald-400'
                 : 'border-transparent text-slate-400 hover:text-slate-300',
@@ -595,7 +568,7 @@ function batchImportWallets() {
           <button
             @click="walletTab = 'import'"
             :class="[
-              'px-4 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 -mb-px transition',
+              'px-4 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 -mb-px transition cursor-pointer',
               walletTab === 'import'
                 ? 'border-emerald-400 text-emerald-400'
                 : 'border-transparent text-slate-400 hover:text-slate-300',
@@ -614,10 +587,11 @@ function batchImportWallets() {
           :list="wallets"
           class="flex flex-col gap-2"
           item-key="address"
+          handle=".drag-handle"
         >
           <template #item="{ element, index }">
             <li
-              class="group flex items-center justify-between bg-slate-700/60 hover:bg-slate-700 border border-slate-600 hover:border-slate-500 rounded-xl px-4 py-3 cursor-grab active:cursor-grabbing transition"
+              class="flex items-center justify-between bg-slate-700/60 border border-slate-600 rounded-xl px-3 py-3 transition"
             >
               <div class="min-w-0 flex-1">
                 <div class="flex items-baseline gap-2">
@@ -632,13 +606,23 @@ function batchImportWallets() {
                   {{ element.address }}
                 </p>
               </div>
-              <button
-                @click.stop="wallets.splice(index, 1)"
-                class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 w-8 h-8 rounded-lg flex items-center justify-center transition shrink-0 ml-2"
-                title="Xóa"
-              >
-                <i class="pi pi-trash text-sm"></i>
-              </button>
+              <div class="flex items-center gap-1 shrink-0 ml-2">
+                <button
+                  type="button"
+                  class="drag-handle text-slate-400 hover:text-slate-200 hover:bg-slate-600 w-9 h-9 rounded-lg flex items-center justify-center transition cursor-grab active:cursor-grabbing touch-none"
+                  title="Kéo để sắp xếp"
+                  aria-label="Kéo để sắp xếp"
+                >
+                  <i class="pi pi-bars text-sm"></i>
+                </button>
+                <button
+                  @click.stop="wallets.splice(index, 1)"
+                  class="text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 w-9 h-9 rounded-lg flex items-center justify-center transition cursor-pointer"
+                  title="Xóa"
+                >
+                  <i class="pi pi-trash text-sm"></i>
+                </button>
+              </div>
             </li>
           </template>
         </draggable>
@@ -650,7 +634,7 @@ function batchImportWallets() {
           <p class="text-sm">Chưa có ví nào trong danh sách</p>
           <button
             @click="walletTab = 'add'"
-            class="mt-4 text-emerald-400 hover:text-emerald-300 text-xs font-semibold"
+            class="mt-4 text-emerald-400 hover:text-emerald-300 text-xs font-semibold cursor-pointer"
           >
             Thêm ví đầu tiên →
           </button>
@@ -680,7 +664,7 @@ function batchImportWallets() {
         </div>
         <button
           @click="addWallet"
-          class="bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-semibold rounded-lg py-2.5 text-sm transition mt-1"
+          class="bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-semibold rounded-lg py-2.5 text-sm transition mt-1 cursor-pointer"
         >
           Thêm ví
         </button>
@@ -702,7 +686,7 @@ function batchImportWallets() {
         ></textarea>
         <button
           @click="batchImportWallets"
-          class="bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-semibold rounded-lg py-2.5 text-sm transition"
+          class="bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-semibold rounded-lg py-2.5 text-sm transition cursor-pointer"
         >
           Import
         </button>
@@ -711,7 +695,7 @@ function batchImportWallets() {
       <template #footer>
         <button
           @click="shouldShowWalletModal = false"
-          class="w-full sm:w-auto bg-slate-700 hover:bg-slate-600 text-slate-100 rounded-lg px-5 py-2 text-sm font-medium transition"
+          class="w-full sm:w-auto bg-slate-700 hover:bg-slate-600 text-slate-100 rounded-lg px-5 py-2 text-sm font-medium transition cursor-pointer"
         >
           Hoàn Thành
         </button>
