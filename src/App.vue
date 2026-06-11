@@ -411,7 +411,7 @@ function batchImportWallets() {
                       : 'text-rose-400'
                   "
                 >
-                  {{ formatNumber(getWalletStats(wallet.address).totalFee) }}
+                  {{ formatNumber(getWalletStats(wallet.address).totalFee, { maximumFractionDigits: 4 }) }}
                 </td>
                 <td class="px-3 py-3 text-right text-slate-300 tabular-nums">
                   {{ getWalletStats(wallet.address).transactionsCount }}
