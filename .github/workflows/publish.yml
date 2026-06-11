@@ -13,8 +13,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22.x"
-      - run: yarn install
-      - run: yarn build-only
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build-only
       - name: Deploy
         uses: crazy-max/ghaction-github-pages@v4
         with:
