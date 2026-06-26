@@ -198,6 +198,14 @@ function addWallet() {
   addToast({ severity: 'success', summary: 'Đã thêm ví', detail: label, life: 1500 })
 }
 
+function clearAllWallets() {
+  if (wallets.value.length === 0) return
+  if (!confirm(`Xóa toàn bộ ${wallets.value.length} ví khỏi danh sách?`)) return
+  wallets.value = []
+  transactionsByWallet.value = {}
+  addToast({ severity: 'success', summary: 'Đã xóa', detail: 'Đã xóa toàn bộ danh sách ví', life: 1500 })
+}
+
 const batchImportText = ref('')
 function batchImportWallets() {
   const lines = batchImportText.value
@@ -344,9 +352,9 @@ function batchImportWallets() {
       v-if="totals.total > 0"
       class="bg-slate-700/40 border border-slate-600 rounded-xl overflow-hidden shadow-lg shadow-black/20"
     >
-      <div class="overflow-x-auto">
+      <div class="overflow-auto max-h-[calc(100vh-13rem)]">
         <table class="w-full text-sm min-w-[760px]">
-          <thead class="bg-slate-800/60">
+          <thead class="bg-slate-800 sticky top-0 z-10">
             <tr class="text-left text-[11px] text-slate-400 uppercase tracking-wider">
               <th class="px-3 py-2.5 font-medium w-10">#</th>
               <th class="px-3 py-2.5 font-medium">Ví</th>
@@ -581,6 +589,16 @@ function batchImportWallets() {
 
       <!-- Tab: List -->
       <div v-if="walletTab === 'list'">
+        <div v-if="wallets.length > 0" class="flex justify-end mb-3">
+          <button
+            @click="clearAllWallets"
+            class="flex items-center gap-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-1.5 text-xs font-semibold transition cursor-pointer"
+            title="Xóa toàn bộ danh sách ví"
+          >
+            <i class="pi pi-trash text-xs"></i>
+            Xóa tất cả
+          </button>
+        </div>
         <draggable
           v-if="wallets.length > 0"
           tag="ul"
