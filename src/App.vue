@@ -56,19 +56,22 @@ function hasData(address: string) {
   return (transactionsByWallet.value[address]?.length || 0) > 0
 }
 
+// Wallets shown on the main screen (hidden ones are filtered out)
+const visibleWallets = computed(() => wallets.value.filter((w) => !w.hidden))
+
 const totals = computed(() => {
   let volume = 0
   let points = 0
   let txCount = 0
   let withData = 0
-  for (const w of wallets.value) {
+  for (const w of visibleWallets.value) {
     const s = getWalletStats(w.address)
     volume += s.totalVolumeUSD
     points += s.points
     txCount += s.transactionsCount
     if (hasData(w.address)) withData++
   }
-  return { volume, points, txCount, withData, total: wallets.value.length }
+  return { volume, points, txCount, withData, total: visibleWallets.value.length }
 })
 
 function openHistory(address: string) {
@@ -238,6 +241,51 @@ function batchImportWallets() {
     })
   }
 }
+
+// --- Edit wallet ---
+const shouldShowEditModal = ref(false)
+const editingIndex = ref<number | null>(null)
+const editAddress = ref('')
+const editLabel = ref('')
+
+function openEditWallet(index: number) {
+  const w = wallets.value[index]
+  if (!w) return
+  editingIndex.value = index
+  editAddress.value = w.address
+  editLabel.value = w.label
+  shouldShowEditModal.value = true
+}
+
+function saveEditWallet() {
+  if (editingIndex.value === null) return
+  const address = editAddress.value.trim()
+  if (!address || !isValidBscAddress(address)) {
+    addToast({ severity: 'error', summary: 'Lỗi', detail: 'Ví không hợp lệ' })
+    return
+  }
+  const dup = wallets.value.some(
+    (w, i) => i !== editingIndex.value && w.address.toLowerCase() === address.toLowerCase(),
+  )
+  if (dup) {
+    addToast({ severity: 'warn', summary: 'Thông báo', detail: 'Ví đã tồn tại' })
+    return
+  }
+  const current = wallets.value[editingIndex.value]
+  const oldAddress = current.address
+  const label = editLabel.value.trim() || address
+
+  // Migrate fetched data if the address changed
+  if (oldAddress !== address && transactionsByWallet.value[oldAddress]) {
+    transactionsByWallet.value[address] = transactionsByWallet.value[oldAddress]
+    delete transactionsByWallet.value[oldAddress]
+  }
+
+  wallets.value[editingIndex.value] = { ...current, address, label }
+  shouldShowEditModal.value = false
+  editingIndex.value = null
+  addToast({ severity: 'success', summary: 'Đã cập nhật ví', detail: label, life: 1500 })
+}
 </script>
 
 <template>
@@ -367,7 +415,7 @@ function batchImportWallets() {
           </thead>
           <tbody>
             <tr
-              v-for="(wallet, idx) in wallets"
+              v-for="(wallet, idx) in visibleWallets"
               :key="wallet.address"
               class="border-t border-slate-600/60 transition"
               :class="{
@@ -627,6 +675,31 @@ function batchImportWallets() {
               <div class="flex items-center gap-1 shrink-0 ml-2">
                 <button
                   type="button"
+                  @click.stop="element.hidden = !element.hidden"
+                  :class="[
+                    'relative w-9 h-5 rounded-full transition shrink-0 cursor-pointer',
+                    element.hidden ? 'bg-amber-500' : 'bg-slate-500',
+                  ]"
+                  :title="element.hidden ? 'Đang ẩn khỏi màn hình chính' : 'Đang hiện ở màn hình chính'"
+                  :aria-label="element.hidden ? 'Bỏ ẩn ví' : 'Ẩn ví'"
+                >
+                  <span
+                    :class="[
+                      'absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all',
+                      element.hidden ? 'left-[18px]' : 'left-0.5',
+                    ]"
+                  ></span>
+                </button>
+                <button
+                  type="button"
+                  @click.stop="openEditWallet(index)"
+                  class="text-slate-400 hover:text-emerald-400 hover:bg-slate-600 w-9 h-9 rounded-lg flex items-center justify-center transition cursor-pointer"
+                  title="Sửa ví"
+                >
+                  <i class="pi pi-pencil text-sm"></i>
+                </button>
+                <button
+                  type="button"
                   class="drag-handle text-slate-400 hover:text-slate-200 hover:bg-slate-600 w-9 h-9 rounded-lg flex items-center justify-center transition cursor-grab active:cursor-grabbing touch-none"
                   title="Kéo để sắp xếp"
                   aria-label="Kéo để sắp xếp"
@@ -716,6 +789,45 @@ function batchImportWallets() {
           class="w-full sm:w-auto bg-slate-700 hover:bg-slate-600 text-slate-100 rounded-lg px-5 py-2 text-sm font-medium transition cursor-pointer"
         >
           Hoàn Thành
+        </button>
+      </template>
+    </AppModal>
+
+    <!-- Edit wallet dialog -->
+    <AppModal v-model:visible="shouldShowEditModal" title="Sửa ví" width="32rem">
+      <div class="flex flex-col gap-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5 font-medium">Địa chỉ ví</label>
+          <input
+            v-model="editAddress"
+            placeholder="0x..."
+            class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 transition font-mono"
+          />
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5 font-medium">
+            Ghi chú <span class="text-slate-500">(tùy chọn)</span>
+          </label>
+          <input
+            v-model="editLabel"
+            placeholder="VD: Ví chính"
+            class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/20 transition"
+            @keyup.enter="saveEditWallet"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <button
+          @click="shouldShowEditModal = false"
+          class="bg-slate-700 hover:bg-slate-600 text-slate-100 rounded-lg px-5 py-2 text-sm font-medium transition cursor-pointer"
+        >
+          Hủy
+        </button>
+        <button
+          @click="saveEditWallet"
+          class="bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-semibold rounded-lg px-5 py-2 text-sm transition cursor-pointer"
+        >
+          Lưu
         </button>
       </template>
     </AppModal>

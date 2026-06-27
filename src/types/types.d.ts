@@ -20,4 +20,5 @@ export type PriceMap = Record<string, number>
 export interface Wallet {
   address: string
   label: string
+  hidden?: boolean
 }
