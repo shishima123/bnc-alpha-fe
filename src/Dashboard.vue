@@ -10,13 +10,12 @@ import {
   isValidBscAddress,
 } from './helpers/ultils.ts'
 import moment from 'moment'
-import { useStorage } from '@vueuse/core'
+import { useStorage, useMediaQuery } from '@vueuse/core'
 import draggable from 'vuedraggable'
 import {
   NLayout,
   NLayoutHeader,
   NLayoutContent,
-  NPageHeader,
   NAvatar,
   NCard,
   NDataTable,
@@ -74,6 +73,8 @@ const activeWalletAddress = ref<string | null>(null)
 const selectedDate = ref<string>(moment(new Date()).format('YYYY-MM-DD'))
 
 const walletTab = ref<'list' | 'add' | 'import'>('list')
+
+const isMobile = useMediaQuery('(max-width: 768px)')
 
 function getWalletStats(address: string) {
   const txs = transactionsByWallet.value[address] || []
@@ -539,42 +540,41 @@ function amountCell(token: Transaction['from']) {
 <template>
   <n-layout style="min-height: 100vh">
     <n-layout-header bordered class="app-header">
-      <n-page-header class="page-header" title="Web3 Wallet Tracker">
-        <template #avatar>
-          <n-avatar color="#10b981" style="color: #06241b; font-weight: 700">α</n-avatar>
-        </template>
-        <template #subtitle>
-          <span class="header-subtitle">Binance Alpha · BSC</span>
-        </template>
-        <template #extra>
-          <n-space align="center" :size="8" class="header-actions">
-            <n-date-picker
-              v-model:formatted-value="selectedDate"
-              value-format="yyyy-MM-dd"
-              type="date"
-              class="header-date"
-            />
-            <n-button secondary @click="shouldShowWalletModal = true">
-              <template #icon>
-                <n-icon><SettingsOutline /></n-icon>
-              </template>
-              Quản lý ví
-            </n-button>
-            <n-button type="info" :disabled="isLoadingResult" @click="fetchDataMissingOnly">
-              <template #icon>
-                <n-icon><FlashOutline /></n-icon>
-              </template>
-              KT Ví Còn Lại
-            </n-button>
-            <n-button type="primary" :loading="isLoadingResult" @click="fetchDataAll">
-              <template #icon>
-                <n-icon><SyncOutline /></n-icon>
-              </template>
-              Kiểm tra
-            </n-button>
-          </n-space>
-        </template>
-      </n-page-header>
+      <div class="header-bar">
+        <n-avatar class="brand-logo" color="#10b981" style="color: #06241b; font-weight: 700">
+          α
+        </n-avatar>
+        <div class="brand-text">
+          <div class="brand-title">Web3 Wallet Tracker</div>
+          <div class="brand-sub">Binance Alpha · BSC</div>
+        </div>
+        <div class="header-actions">
+          <n-date-picker
+            v-model:formatted-value="selectedDate"
+            value-format="yyyy-MM-dd"
+            type="date"
+            class="header-date"
+          />
+          <n-button secondary @click="shouldShowWalletModal = true">
+            <template #icon>
+              <n-icon><SettingsOutline /></n-icon>
+            </template>
+            Quản lý ví
+          </n-button>
+          <n-button type="info" :disabled="isLoadingResult" @click="fetchDataMissingOnly">
+            <template #icon>
+              <n-icon><FlashOutline /></n-icon>
+            </template>
+            KT Ví Còn Lại
+          </n-button>
+          <n-button type="primary" :loading="isLoadingResult" @click="fetchDataAll">
+            <template #icon>
+              <n-icon><SyncOutline /></n-icon>
+            </template>
+            Kiểm tra
+          </n-button>
+        </div>
+      </div>
     </n-layout-header>
 
     <n-layout-content class="app-content">
@@ -596,7 +596,12 @@ function amountCell(token: Transaction['from']) {
           </n-empty>
         </n-card>
 
-        <n-card v-else :bordered="false" content-style="padding: 0" style="overflow: hidden">
+        <n-card
+          v-else-if="!isMobile"
+          :bordered="false"
+          content-style="padding: 0"
+          style="overflow: hidden"
+        >
           <n-data-table
             :columns="columns"
             :data="visibleWallets"
@@ -607,6 +612,85 @@ function amountCell(token: Transaction['from']) {
             :max-height="650"
           />
         </n-card>
+
+        <!-- Mobile: card layout -->
+        <div v-else class="wallet-cards">
+          <n-card
+            v-for="(wallet, idx) in visibleWallets"
+            :key="wallet.address"
+            size="small"
+            :class="{ clickable: hasData(wallet.address) }"
+            @click="openHistory(wallet.address)"
+          >
+            <div class="wc-head">
+              <div class="wc-title">
+                <span class="wc-idx">{{ idx + 1 }}.</span>
+                <div style="min-width: 0">
+                  <div class="wc-label">{{ wallet.label }}</div>
+                  <div class="wc-addr">{{ useShortenAddress(wallet.address) }}</div>
+                </div>
+              </div>
+              <div class="wc-actions">
+                <n-button
+                  quaternary
+                  circle
+                  size="small"
+                  :loading="loadingWallets.has(wallet.address)"
+                  :disabled="isLoadingWallet(wallet.address)"
+                  title="Reload ví này"
+                  @click.stop="fetchDataForWallet(wallet.address)"
+                >
+                  <template #icon>
+                    <n-icon><RefreshOutline /></n-icon>
+                  </template>
+                </n-button>
+                <n-button
+                  v-if="hasData(wallet.address) && !loadingWallets.has(wallet.address)"
+                  quaternary
+                  circle
+                  size="small"
+                  title="Chi tiết"
+                  @click.stop="openHistory(wallet.address)"
+                >
+                  <template #icon>
+                    <n-icon><ArrowForwardOutline /></n-icon>
+                  </template>
+                </n-button>
+              </div>
+            </div>
+
+            <n-skeleton
+              v-if="isLoadingWallet(wallet.address)"
+              text
+              :repeat="2"
+              style="margin-top: 12px"
+            />
+            <div v-else-if="hasData(wallet.address)" class="wc-stats">
+              <div class="wc-stat">
+                <span class="wc-k">Khối lượng</span>
+                <span class="wc-v">${{ formatNumber(getWalletStats(wallet.address).totalVolumeUSD) }}</span>
+              </div>
+              <div class="wc-stat">
+                <span class="wc-k">Điểm</span>
+                <n-text class="wc-v" type="success">{{ getWalletStats(wallet.address).points }}</n-text>
+              </div>
+              <div class="wc-stat">
+                <span class="wc-k">Phí</span>
+                <n-text
+                  class="wc-v"
+                  :type="getWalletStats(wallet.address).totalFee >= 0 ? 'success' : 'error'"
+                >
+                  {{ formatNumber(getWalletStats(wallet.address).totalFee, { maximumFractionDigits: 4 }) }}
+                </n-text>
+              </div>
+              <div class="wc-stat">
+                <span class="wc-k">Giao dịch</span>
+                <span class="wc-v">{{ getWalletStats(wallet.address).transactionsCount }}</span>
+              </div>
+            </div>
+            <div v-else class="wc-empty">Chưa có dữ liệu</div>
+          </n-card>
+        </div>
       </n-space>
     </n-layout-content>
 
@@ -829,19 +913,99 @@ function amountCell(token: Transaction['from']) {
 .app-content {
   padding: 24px;
 }
+.header-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand-logo {
+  flex: 0 0 auto;
+}
+.brand-text {
+  margin-right: auto;
+  line-height: 1.15;
+}
+.brand-title {
+  font-weight: 700;
+  font-size: 18px;
+}
+.brand-sub {
+  color: #909399;
+  font-size: 12px;
+}
 .header-date {
   width: 150px;
 }
-
-/* Let the page-header row wrap so controls drop below the title on narrow screens */
-.page-header :deep(.n-page-header__main) {
-  flex-wrap: wrap;
-  gap: 12px 16px;
+.header-actions {
+  display: flex;
   align-items: center;
+  gap: 8px;
 }
-.page-header :deep(.n-page-header__header) {
-  flex: 1 1 auto;
+
+/* Mobile wallet cards */
+.wallet-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.wallet-cards .clickable {
+  cursor: pointer;
+}
+.wc-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.wc-title {
+  display: flex;
+  gap: 6px;
   min-width: 0;
+}
+.wc-idx {
+  color: #909399;
+  flex: 0 0 auto;
+}
+.wc-label {
+  font-weight: 600;
+  word-break: break-word;
+}
+.wc-addr {
+  font-size: 12px;
+  color: #909399;
+  font-family: monospace;
+  margin-top: 2px;
+}
+.wc-actions {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.wc-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+  margin-top: 12px;
+}
+.wc-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wc-k {
+  font-size: 11px;
+  color: #909399;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.wc-v {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.wc-empty {
+  margin-top: 10px;
+  color: #909399;
+  font-size: 13px;
 }
 
 @media (max-width: 768px) {
@@ -851,17 +1015,21 @@ function amountCell(token: Transaction['from']) {
   .app-content {
     padding: 16px;
   }
-  .header-subtitle {
+  /* Compact mobile header: hide branding, lay controls out in a 2-column grid */
+  .brand-logo,
+  .brand-text {
     display: none;
   }
   .header-actions {
     width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
   }
-  .header-actions :deep(.n-button) {
-    flex: 1 1 auto;
+  .header-actions > * {
+    width: 100%;
   }
   .header-date {
-    flex: 1 1 100%;
     width: 100%;
   }
 }
