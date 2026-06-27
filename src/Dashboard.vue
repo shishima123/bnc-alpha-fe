@@ -10,7 +10,7 @@ import {
   isValidBscAddress,
 } from './helpers/ultils.ts'
 import moment from 'moment'
-import { useStorage, useMediaQuery } from '@vueuse/core'
+import { useStorage } from '@vueuse/core'
 import draggable from 'vuedraggable'
 import {
   NLayout,
@@ -73,8 +73,6 @@ const activeWalletAddress = ref<string | null>(null)
 const selectedDate = ref<string>(moment(new Date()).format('YYYY-MM-DD'))
 
 const walletTab = ref<'list' | 'add' | 'import'>('list')
-
-const isMobile = useMediaQuery('(max-width: 768px)')
 
 function getWalletStats(address: string) {
   const txs = transactionsByWallet.value[address] || []
@@ -339,126 +337,8 @@ function saveEditWallet() {
 const hideRailStyle = ({ checked }: { checked: boolean }) =>
   checked ? { background: '#f0a020' } : {}
 
-// --- Main wallet table ---
+// --- Wallet cards ---
 const mono = 'font-family: var(--n-font-family-mono, monospace);'
-
-function numericCell(address: string, value: () => any) {
-  if (isLoadingWallet(address)) return h(NSkeleton, { text: true, width: 60 })
-  if (!hasData(address)) return h(NText, { depth: 3 }, { default: () => '—' })
-  return value()
-}
-
-const columns = computed<DataTableColumns<Wallet>>(() => [
-  {
-    title: '#',
-    key: 'index',
-    width: 50,
-    render: (_row, index) => index + 1,
-  },
-  {
-    title: 'Ví',
-    key: 'wallet',
-    minWidth: 160,
-    render: (row) =>
-      h('div', { style: 'line-height:1.3' }, [
-        h(
-          'div',
-          { style: 'font-weight:600; white-space:nowrap' },
-          row.label,
-        ),
-        h(NText, { depth: 3, style: `font-size:12px;${mono}` }, () =>
-          useShortenAddress(row.address),
-        ),
-      ]),
-  },
-  {
-    title: 'Khối lượng',
-    key: 'volume',
-    align: 'right',
-    width: 120,
-    render: (row) =>
-      numericCell(row.address, () =>
-        h('strong', null, '$' + formatNumber(getWalletStats(row.address).totalVolumeUSD)),
-      ),
-  },
-  {
-    title: 'Điểm',
-    key: 'points',
-    align: 'right',
-    width: 90,
-    render: (row) =>
-      numericCell(row.address, () =>
-        h(NText, { type: 'success', strong: true }, () => getWalletStats(row.address).points),
-      ),
-  },
-  {
-    title: 'Phí',
-    key: 'fee',
-    align: 'right',
-    width: 110,
-    render: (row) =>
-      numericCell(row.address, () => {
-        const fee = getWalletStats(row.address).totalFee
-        return h(NText, { type: fee >= 0 ? 'success' : 'error' }, () =>
-          formatNumber(fee, { maximumFractionDigits: 4 }),
-        )
-      }),
-  },
-  {
-    title: 'Giao dịch',
-    key: 'txCount',
-    align: 'right',
-    width: 110,
-    render: (row) =>
-      numericCell(row.address, () => getWalletStats(row.address).transactionsCount),
-  },
-  {
-    title: 'Thao tác',
-    key: 'actions',
-    align: 'right',
-    width: 110,
-    render: (row) =>
-      h(NSpace, { justify: 'end', size: 4, wrap: false }, () => [
-        h(
-          NButton,
-          {
-            quaternary: true,
-            circle: true,
-            size: 'small',
-            loading: loadingWallets.value.has(row.address),
-            disabled: isLoadingWallet(row.address),
-            title: 'Reload ví này',
-            onClick: (e: MouseEvent) => {
-              e.stopPropagation()
-              fetchDataForWallet(row.address)
-            },
-          },
-          { icon: () => h(NIcon, null, () => h(RefreshOutline)) },
-        ),
-        hasData(row.address) && !loadingWallets.value.has(row.address)
-          ? h(
-              NButton,
-              {
-                quaternary: true,
-                circle: true,
-                size: 'small',
-                title: 'Chi tiết',
-                onClick: (e: MouseEvent) => {
-                  e.stopPropagation()
-                  openHistory(row.address)
-                },
-              },
-              { icon: () => h(NIcon, null, () => h(ArrowForwardOutline)) },
-            )
-          : null,
-      ]),
-  },
-])
-
-const rowProps = (row: Wallet) => ({
-  style: hasData(row.address) ? 'cursor: pointer;' : undefined,
-  onClick: () => openHistory(row.address),
-})
 
 // --- History (transactions) table ---
 const historyData = computed(() =>
@@ -596,30 +476,16 @@ function amountCell(token: Transaction['from']) {
           </n-empty>
         </n-card>
 
-        <n-card
-          v-else-if="!isMobile"
-          :bordered="false"
-          content-style="padding: 0"
-          style="overflow: hidden"
-        >
-          <n-data-table
-            :columns="columns"
-            :data="visibleWallets"
-            :row-key="(row: Wallet) => row.address"
-            :row-props="rowProps"
-            :bordered="false"
-            :scroll-x="760"
-            :max-height="650"
-          />
-        </n-card>
-
-        <!-- Mobile: card layout -->
+        <!-- Card layout -->
         <div v-else class="wallet-cards">
           <n-card
             v-for="(wallet, idx) in visibleWallets"
             :key="wallet.address"
             size="small"
-            :class="{ clickable: hasData(wallet.address) }"
+            :class="{
+              clickable: hasData(wallet.address),
+              traded: hasData(wallet.address),
+            }"
             @click="openHistory(wallet.address)"
           >
             <div class="wc-head">
@@ -942,14 +808,27 @@ function amountCell(token: Transaction['from']) {
   gap: 8px;
 }
 
-/* Mobile wallet cards */
+/* Wallet cards — responsive grid (fills wide screens, single column on mobile) */
 .wallet-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+  align-items: start;
 }
 .wallet-cards .clickable {
   cursor: pointer;
+}
+
+/* Traded wallets stand out: green accent bar and stronger shadow */
+.wallet-cards .traded {
+  border-color: #10b981;
+  border-left: 4px solid #10b981;
+  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.18);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.wallet-cards .traded:hover {
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.28);
+  transform: translateY(-2px);
 }
 .wc-head {
   display: flex;

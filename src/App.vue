@@ -10,6 +10,8 @@ const themeOverrides: GlobalThemeOverrides = {
     primaryColorPressed: '#059669',
     primaryColorSuppl: '#34d399',
     borderRadius: '10px',
+    fontFamily:
+      "'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
   },
   Layout: {
     color: '#f0f2f5',
