@@ -340,6 +340,121 @@ const hideRailStyle = ({ checked }: { checked: boolean }) =>
 // --- Wallet cards ---
 const mono = 'font-family: var(--n-font-family-mono, monospace);'
 
+// --- Wallet table (desktop) ---
+const emptyCell = () => h(NText, { depth: 3 }, () => '—')
+
+const walletColumns = computed<DataTableColumns<Wallet>>(() => [
+  {
+    title: '#',
+    key: 'index',
+    width: 48,
+    align: 'center',
+    render: (_row, index) => index + 1,
+  },
+  {
+    title: 'Ví',
+    key: 'wallet',
+    minWidth: 180,
+    render: (row) => h('div', { style: 'font-weight:600' }, row.label),
+  },
+  {
+    title: 'Khối lượng',
+    key: 'volume',
+    width: 120,
+    align: 'center',
+    render: (row) =>
+      hasData(row.address)
+        ? `$${formatNumber(getWalletStats(row.address).totalVolumeUSD)}`
+        : emptyCell(),
+  },
+  {
+    title: 'Điểm',
+    key: 'points',
+    width: 80,
+    align: 'center',
+    render: (row) =>
+      hasData(row.address)
+        ? h(NText, { type: 'success', strong: true }, () =>
+            String(getWalletStats(row.address).points),
+          )
+        : emptyCell(),
+  },
+  {
+    title: 'Phí',
+    key: 'fee',
+    width: 110,
+    align: 'center',
+    render: (row) => {
+      if (!hasData(row.address)) return emptyCell()
+      const fee = getWalletStats(row.address).totalFee
+      return h(NText, { type: fee >= 0 ? 'success' : 'error' }, () =>
+        formatNumber(fee, { maximumFractionDigits: 4 }),
+      )
+    },
+  },
+  {
+    title: 'Giao dịch',
+    key: 'tx',
+    width: 90,
+    align: 'center',
+    render: (row) =>
+      hasData(row.address) ? getWalletStats(row.address).transactionsCount : emptyCell(),
+  },
+  {
+    title: '',
+    key: 'actions',
+    width: 96,
+    align: 'center',
+    render: (row) =>
+      h(NSpace, { size: 4, justify: 'center', wrap: false, align: 'center' }, () => {
+        const buttons = [
+          h(
+            NButton,
+            {
+              quaternary: true,
+              circle: true,
+              size: 'small',
+              loading: loadingWallets.value.has(row.address),
+              disabled: isLoadingWallet(row.address),
+              title: 'Reload ví này',
+              onClick: (e: MouseEvent) => {
+                e.stopPropagation()
+                fetchDataForWallet(row.address)
+              },
+            },
+            { icon: () => h(NIcon, null, () => h(RefreshOutline)) },
+          ),
+        ]
+        if (hasData(row.address) && !loadingWallets.value.has(row.address)) {
+          buttons.push(
+            h(
+              NButton,
+              {
+                quaternary: true,
+                circle: true,
+                size: 'small',
+                title: 'Chi tiết',
+                onClick: (e: MouseEvent) => {
+                  e.stopPropagation()
+                  openHistory(row.address)
+                },
+              },
+              { icon: () => h(NIcon, null, () => h(ArrowForwardOutline)) },
+            ),
+          )
+        }
+        return buttons
+      }),
+  },
+])
+
+const walletRowProps = (row: Wallet) => ({
+  style: hasData(row.address) ? 'cursor:pointer' : '',
+  onClick: () => openHistory(row.address),
+})
+
+const walletRowClassName = (row: Wallet) => (hasData(row.address) ? 'traded-row' : '')
+
 // --- History (transactions) table ---
 const historyData = computed(() =>
   activeWalletAddress.value ? transactionsByWallet.value[activeWalletAddress.value] || [] : [],
@@ -476,8 +591,22 @@ function amountCell(token: Transaction['from']) {
           </n-empty>
         </n-card>
 
-        <!-- Card layout -->
-        <div v-else class="wallet-cards">
+        <!-- Table layout (desktop) -->
+        <n-data-table
+          v-else
+          class="wallet-table"
+          size="small"
+          :columns="walletColumns"
+          :data="visibleWallets"
+          :row-props="walletRowProps"
+          :row-class-name="walletRowClassName"
+          :bordered="false"
+          :single-line="false"
+          striped
+        />
+
+        <!-- Card layout (mobile) -->
+        <div v-if="totals.total > 0" class="wallet-cards">
           <n-card
             v-for="(wallet, idx) in visibleWallets"
             :key="wallet.address"
@@ -778,11 +907,17 @@ function amountCell(token: Transaction['from']) {
 }
 .app-content {
   padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
 }
 .header-bar {
   display: flex;
   align-items: center;
   gap: 12px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
 }
 .brand-logo {
   flex: 0 0 auto;
@@ -808,9 +943,21 @@ function amountCell(token: Transaction['from']) {
   gap: 8px;
 }
 
-/* Wallet cards — responsive grid (fills wide screens, single column on mobile) */
+/* Desktop shows the table; cards are reserved for mobile (toggled in media query) */
+.wallet-table {
+  display: block;
+}
+/* Keep the green tint on traded rows even when striped overrides even rows */
+.wallet-table :deep(.traded-row td) {
+  background-color: rgba(16, 185, 129, 0.08) !important;
+}
+.wallet-table :deep(.traded-row:hover td) {
+  background-color: rgba(16, 185, 129, 0.14) !important;
+}
+
+/* Wallet cards — responsive grid (mobile only) */
 .wallet-cards {
-  display: grid;
+  display: none;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 12px;
   align-items: start;
@@ -888,6 +1035,13 @@ function amountCell(token: Transaction['from']) {
 }
 
 @media (max-width: 768px) {
+  /* Mobile: hide the table, show the card grid instead */
+  .wallet-table {
+    display: none;
+  }
+  .wallet-cards {
+    display: grid;
+  }
   .app-header {
     padding: 12px 16px;
   }
