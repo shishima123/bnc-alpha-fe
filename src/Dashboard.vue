@@ -204,19 +204,54 @@ async function fetchDataMissingOnly() {
 const fetchPrices = async () => {
   try {
     const response = await fetch(
-      'https://min-api.cryptocompare.com/data/price?fsym=BNB&tsyms=USD',
+      'https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT',
     )
     const data = await response.json()
-    prices.value = { USDT: 1, BNB: data.USD || 0 }
+    prices.value = { USDT: 1, BNB: parseFloat(data.price) || 0 }
   } catch (err) {
     console.error('Error fetching prices:', err)
   }
 }
 
+// Cache hệ số nhân khối lượng theo contract address (x4 nếu token có tag "4x Alpha Points")
+const tokenMultiplierCache = new Map<string, number>()
+
+async function getVolumeMultiplier(contractAddress: string): Promise<number> {
+  const key = contractAddress.toLowerCase()
+  const cached = tokenMultiplierCache.get(key)
+  if (cached !== undefined) return cached
+  try {
+    const res = await fetch(
+      `https://web3.binance.com/bapi/defi/v1/public/wallet-direct/buw/wallet/dex/market/token/tag/info?chainId=56&contractAddress=${contractAddress}`,
+    )
+    const json = await res.json()
+    const tags = Object.values(json?.data || {}).flat() as { tagName?: string }[]
+    const multiplier = tags.some((t) => t.tagName === '4x Alpha Points') ? 4 : 1
+    tokenMultiplierCache.set(key, multiplier)
+    return multiplier
+  } catch (err) {
+    console.error(`Error fetching tag info for ${contractAddress}:`, err)
+    return 1
+  }
+}
+
 const calculateVolume = async () => {
+  // Lấy hệ số nhân cho các token được mua (phía "to" khi bán USDT), tránh gọi trùng
+  const allTxs = Object.values(transactionsByWallet.value).flat()
+  const buyTokenAddresses = new Set(
+    allTxs.filter((tx) => tx.from.symbol === 'USDT').map((tx) => tx.to.address.toLowerCase()),
+  )
+  const multipliers = new Map<string, number>()
+  await Promise.all(
+    [...buyTokenAddresses].map(async (addr) => {
+      multipliers.set(addr, await getVolumeMultiplier(addr))
+    }),
+  )
+
   for (const [wallet, txs] of Object.entries(transactionsByWallet.value)) {
     transactionsByWallet.value[wallet] = txs.map((tx) => {
-      const volumeUSD = tx.from.symbol === 'USDT' ? tx.from.amount : 0
+      const multiplier = multipliers.get(tx.to.address.toLowerCase()) ?? 1
+      const volumeUSD = tx.from.symbol === 'USDT' ? tx.from.amount * multiplier : 0
       return { ...tx, volumeUSD }
     })
   }
@@ -508,9 +543,14 @@ const historyColumns = computed<DataTableColumns<Transaction>>(() => [
     key: 'gas',
     width: 150,
     render: (row) =>
-      h('span', null, [
-        h('span', null, row.gas),
-        h(NText, { depth: 3, style: 'font-size:12px;margin-left:4px' }, () => 'BNB'),
+      h('div', { style: 'line-height:1.3' }, [
+        h('span', null, [
+          h('span', null, row.gas),
+          h(NText, { depth: 3, style: 'font-size:12px;margin-left:4px' }, () => 'BNB'),
+        ]),
+        h(NText, { depth: 3, style: 'font-size:12px;display:block;margin-top:2px' }, () =>
+          `≈ $${formatNumber(row.gas * (prices.value['BNB'] || 0), { maximumFractionDigits: 4 })}`,
+        ),
       ]),
   },
 ])
