@@ -986,6 +986,12 @@ function amountCell(token: Transaction['from']) {
 /* Desktop shows the table; cards are reserved for mobile (toggled in media query) */
 .wallet-table {
   display: block;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 2px 8px rgba(16, 24, 40, 0.05);
+}
+/* Cards share the same soft elevation as the table */
+.app-content :deep(.n-card) {
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 2px 8px rgba(16, 24, 40, 0.05);
 }
 /* Keep the green tint on traded rows even when striped overrides even rows */
 .wallet-table :deep(.traded-row td) {

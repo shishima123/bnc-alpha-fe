@@ -14,7 +14,7 @@ const themeOverrides: GlobalThemeOverrides = {
       "'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
   },
   Layout: {
-    color: '#f0f2f5',
+    color: '#e9ebf0',
     headerColor: '#ffffff',
   },
 }
