@@ -12,7 +12,7 @@ export interface Transaction {
   gas: number
   from: TokenInfo
   to: TokenInfo
-  volumeUSD: number
+  volumeUSD?: number
 }
 
 export type PriceMap = Record<string, number>

@@ -2,6 +2,7 @@
 import axiosInstance from '@/apis/http-common.ts'
 import { ref, computed, h } from 'vue'
 import type { PriceMap, Transaction, Wallet } from '@/types/types'
+import { getBuyVolumeUSD, getStablecoinNetAmount } from './helpers/transactions.ts'
 import {
   useShortenAddress,
   bscScanTxUrl,
@@ -76,21 +77,13 @@ const walletTab = ref<'list' | 'add' | 'import'>('list')
 
 function getWalletStats(address: string) {
   const txs = transactionsByWallet.value[address] || []
-  const totalVolumeUSD = txs.reduce((total, tx) => total + (tx as any).volumeUSD, 0)
+  const totalVolumeUSD = txs.reduce((total, tx) => total + (tx.volumeUSD ?? getBuyVolumeUSD(tx)), 0)
   const points = closestPowerOfTwo(totalVolumeUSD)
   const gasFeeBNB = txs.reduce((sum, tx) => sum + tx.gas, 0)
   const gasFeeUSDT = gasFeeBNB * (prices.value['BNB'] || 0)
 
-  let sent = 0
-  let received = 0
-  txs.forEach((tx) => {
-    if (tx.status !== 'success') return
-    if (tx.from.symbol === 'USDT') sent += tx.from.amount
-    if (tx.to.symbol === 'USDT') received += tx.to.amount
-  })
-
-  const usdtFee = received - sent
-  const totalFee = usdtFee - gasFeeUSDT
+  const stablecoinNetAmount = txs.reduce((sum, tx) => sum + getStablecoinNetAmount(tx), 0)
+  const totalFee = stablecoinNetAmount - gasFeeUSDT
   const transactionsCount = txs.length
 
   return { totalVolumeUSD, points, gasFeeBNB, gasFeeUSDT, totalFee, transactionsCount }
@@ -236,10 +229,10 @@ async function getVolumeMultiplier(contractAddress: string): Promise<number> {
 }
 
 const calculateVolume = async () => {
-  // Lấy hệ số nhân cho các token được mua (phía "to" khi bán USDT), tránh gọi trùng
+  // Lấy hệ số nhân cho các token được mua bằng USDT, USDC hoặc U, tránh gọi trùng
   const allTxs = Object.values(transactionsByWallet.value).flat()
   const buyTokenAddresses = new Set(
-    allTxs.filter((tx) => tx.from.symbol === 'USDT').map((tx) => tx.to.address.toLowerCase()),
+    allTxs.filter((tx) => getBuyVolumeUSD(tx) > 0).map((tx) => tx.to.address.toLowerCase()),
   )
   const multipliers = new Map<string, number>()
   await Promise.all(
@@ -251,7 +244,7 @@ const calculateVolume = async () => {
   for (const [wallet, txs] of Object.entries(transactionsByWallet.value)) {
     transactionsByWallet.value[wallet] = txs.map((tx) => {
       const multiplier = multipliers.get(tx.to.address.toLowerCase()) ?? 1
-      const volumeUSD = tx.from.symbol === 'USDT' ? tx.from.amount * multiplier : 0
+      const volumeUSD = getBuyVolumeUSD(tx, multiplier)
       return { ...tx, volumeUSD }
     })
   }
