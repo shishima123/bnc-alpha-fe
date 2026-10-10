@@ -80,13 +80,13 @@ function getWalletStats(address: string) {
   const totalVolumeUSD = txs.reduce((total, tx) => total + (tx.volumeUSD ?? getBuyVolumeUSD(tx)), 0)
   const points = closestPowerOfTwo(totalVolumeUSD)
   const gasFeeBNB = txs.reduce((sum, tx) => sum + tx.gas, 0)
-  const gasFeeUSDT = gasFeeBNB * (prices.value['BNB'] || 0)
+  const gasFeeUSD = gasFeeBNB * (prices.value['BNB'] || 0)
 
-  const stablecoinNetAmount = txs.reduce((sum, tx) => sum + getStablecoinNetAmount(tx), 0)
-  const totalFee = stablecoinNetAmount - gasFeeUSDT
+  const usdFee = txs.reduce((sum, tx) => sum + getStablecoinNetAmount(tx), 0)
+  const totalFee = usdFee - gasFeeUSD
   const transactionsCount = txs.length
 
-  return { totalVolumeUSD, points, gasFeeBNB, gasFeeUSDT, totalFee, transactionsCount }
+  return { totalVolumeUSD, points, gasFeeBNB, gasFeeUSD, usdFee, totalFee, transactionsCount }
 }
 
 function hasData(address: string) {
@@ -371,6 +371,17 @@ const mono = 'font-family: var(--n-font-family-mono, monospace);'
 // --- Wallet table (desktop) ---
 const emptyCell = () => h(NText, { depth: 3 }, () => '—')
 
+const formatFeeUSD = (fee: number) =>
+  formatNumber(fee || 0, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 4,
+  })
+
+const feeCell = (fee: number, strong = false) =>
+  h(NText, { type: fee >= 0 ? 'success' : 'error', strong }, () => formatFeeUSD(fee))
+
 const walletColumns = computed<DataTableColumns<Wallet>>(() => [
   {
     title: '#',
@@ -410,15 +421,33 @@ const walletColumns = computed<DataTableColumns<Wallet>>(() => [
   {
     title: 'Phí',
     key: 'fee',
-    width: 110,
     align: 'center',
-    render: (row) => {
-      if (!hasData(row.address)) return emptyCell()
-      const fee = getWalletStats(row.address).totalFee
-      return h(NText, { type: fee >= 0 ? 'success' : 'error' }, () =>
-        formatNumber(fee, { maximumFractionDigits: 4 }),
-      )
-    },
+    children: [
+      {
+        title: 'Phí USD',
+        key: 'usdFee',
+        width: 110,
+        align: 'center',
+        render: (row) =>
+          hasData(row.address) ? feeCell(getWalletStats(row.address).usdFee) : emptyCell(),
+      },
+      {
+        title: 'Phí Gas',
+        key: 'gasFee',
+        width: 110,
+        align: 'center',
+        render: (row) =>
+          hasData(row.address) ? feeCell(-getWalletStats(row.address).gasFeeUSD) : emptyCell(),
+      },
+      {
+        title: 'Tổng phí',
+        key: 'totalFee',
+        width: 110,
+        align: 'center',
+        render: (row) =>
+          hasData(row.address) ? feeCell(getWalletStats(row.address).totalFee, true) : emptyCell(),
+      },
+    ],
   },
   {
     title: 'Giao dịch',
@@ -635,6 +664,7 @@ function amountCell(token: Transaction['from']) {
           :row-class-name="walletRowClassName"
           :bordered="false"
           :single-line="false"
+          :scroll-x="960"
           striped
         />
 
@@ -703,17 +733,38 @@ function amountCell(token: Transaction['from']) {
                 <n-text class="wc-v" type="success">{{ getWalletStats(wallet.address).points }}</n-text>
               </div>
               <div class="wc-stat">
-                <span class="wc-k">Phí</span>
-                <n-text
-                  class="wc-v"
-                  :type="getWalletStats(wallet.address).totalFee >= 0 ? 'success' : 'error'"
-                >
-                  {{ formatNumber(getWalletStats(wallet.address).totalFee, { maximumFractionDigits: 4 }) }}
-                </n-text>
-              </div>
-              <div class="wc-stat">
                 <span class="wc-k">Giao dịch</span>
                 <span class="wc-v">{{ getWalletStats(wallet.address).transactionsCount }}</span>
+              </div>
+              <div class="wc-fees">
+                <div class="wc-stat">
+                  <span class="wc-k">Phí USD</span>
+                  <n-text
+                    class="wc-v"
+                    :type="getWalletStats(wallet.address).usdFee >= 0 ? 'success' : 'error'"
+                  >
+                    {{ formatFeeUSD(getWalletStats(wallet.address).usdFee) }}
+                  </n-text>
+                </div>
+                <div class="wc-stat">
+                  <span class="wc-k">Phí Gas</span>
+                  <n-text
+                    class="wc-v"
+                    :type="getWalletStats(wallet.address).gasFeeUSD > 0 ? 'error' : 'success'"
+                  >
+                    {{ formatFeeUSD(-getWalletStats(wallet.address).gasFeeUSD) }}
+                  </n-text>
+                </div>
+                <div class="wc-stat">
+                  <span class="wc-k">Tổng phí</span>
+                  <n-text
+                    class="wc-v"
+                    :type="getWalletStats(wallet.address).totalFee >= 0 ? 'success' : 'error'"
+                    strong
+                  >
+                    {{ formatFeeUSD(getWalletStats(wallet.address).totalFee) }}
+                  </n-text>
+                </div>
               </div>
             </div>
             <div v-else class="wc-empty">Chưa có dữ liệu</div>
@@ -1056,6 +1107,18 @@ function amountCell(token: Transaction['from']) {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+.wc-fees {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  border-top: 1px solid rgba(16, 24, 40, 0.08);
+  padding-top: 10px;
+}
+.wc-fees .wc-v {
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }
 .wc-k {
   font-size: 11px;
