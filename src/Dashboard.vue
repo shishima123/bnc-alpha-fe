@@ -3,6 +3,10 @@ import axiosInstance from '@/apis/http-common.ts'
 import { ref, computed, h } from 'vue'
 import type { PriceMap, Transaction, Wallet } from '@/types/types'
 import { getBuyVolumeUSD, getStablecoinNetAmount } from './helpers/transactions.ts'
+import { isValidPointTarget, MAX_TARGET_POINTS } from './helpers/points.ts'
+import WalletVolumeTarget from './components/WalletVolumeTarget.vue'
+import WalletPointTargetSelect from './components/WalletPointTargetSelect.vue'
+import WalletTradeAmountInput from './components/WalletTradeAmountInput.vue'
 import {
   useShortenAddress,
   bscScanTxUrl,
@@ -64,9 +68,14 @@ function notify(opts: { severity: ToastSeverity; summary: string; detail?: strin
 }
 
 const wallets = useStorage<Wallet[]>('wallets', [])
+const isVolumeTargetEnabled = useStorage(
+  'remaining-volume-enabled',
+  wallets.value.some((wallet) => isValidPointTarget(wallet.targetPoints)),
+)
 const transactionsByWallet = ref<Record<string, Transaction[]>>({})
 const prices = ref<PriceMap>({})
 const shouldShowWalletModal = ref(false)
+const shouldShowSettingsModal = ref(false)
 const isLoadingResult = ref(false)
 const loadingWallets = ref<Set<string>>(new Set())
 const shouldShowHistoryDialog = ref(false)
@@ -99,6 +108,18 @@ function isLoadingWallet(address: string) {
 
 // Wallets shown on the main screen (hidden ones are filtered out)
 const visibleWallets = computed(() => wallets.value.filter((w) => !w.hidden))
+const showVolumeTargets = computed(
+  () =>
+    isVolumeTargetEnabled.value &&
+    visibleWallets.value.some((wallet) => isValidPointTarget(wallet.targetPoints)),
+)
+
+function getFetchedVolume(address: string): number | undefined {
+  // An empty fetched result is zero volume; an unchecked wallet has no known volume yet.
+  return transactionsByWallet.value[address] === undefined
+    ? undefined
+    : getWalletStats(address).totalVolumeUSD
+}
 
 const totals = computed(() => {
   let withData = 0
@@ -163,9 +184,7 @@ async function fetchDataForWallet(address: string) {
 }
 
 async function fetchDataMissingOnly() {
-  const missingWallets = wallets.value
-    .filter((w) => !hasData(w.address))
-    .map((w) => w.address)
+  const missingWallets = wallets.value.filter((w) => !hasData(w.address)).map((w) => w.address)
 
   if (missingWallets.length === 0) {
     notify({ severity: 'info', summary: 'Thông báo', detail: 'Tất cả ví đều đã có dữ liệu' })
@@ -196,9 +215,7 @@ async function fetchDataMissingOnly() {
 
 const fetchPrices = async () => {
   try {
-    const response = await fetch(
-      'https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT',
-    )
+    const response = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BNBUSDT')
     const data = await response.json()
     prices.value = { USDT: 1, BNB: parseFloat(data.price) || 0 }
   } catch (err) {
@@ -252,8 +269,20 @@ const calculateVolume = async () => {
 
 const newWalletAddress = ref('')
 const newWalletLabel = ref('')
+const newWalletTargetPoints = ref<number | null>(null)
+
+function validatePointTarget(target: number | null): boolean {
+  if (target === null || isValidPointTarget(target)) return true
+  notify({
+    severity: 'error',
+    summary: 'Mốc điểm không hợp lệ',
+    detail: `Nhập số nguyên từ 1 đến ${MAX_TARGET_POINTS}, hoặc để trống để tắt theo dõi`,
+  })
+  return false
+}
 
 function addWallet() {
+  if (!validatePointTarget(newWalletTargetPoints.value)) return
   const address = newWalletAddress.value.trim()
   if (!address || !isValidBscAddress(address)) {
     notify({ severity: 'error', summary: 'Lỗi', detail: 'Ví không hợp lệ' })
@@ -264,9 +293,10 @@ function addWallet() {
     return
   }
   const label = newWalletLabel.value.trim() || address
-  wallets.value.push({ address, label })
+  wallets.value.push({ address, label, targetPoints: newWalletTargetPoints.value })
   newWalletAddress.value = ''
   newWalletLabel.value = ''
+  newWalletTargetPoints.value = null
   notify({ severity: 'success', summary: 'Đã thêm ví', detail: label })
 }
 
@@ -322,6 +352,7 @@ const shouldShowEditModal = ref(false)
 const editingIndex = ref<number | null>(null)
 const editAddress = ref('')
 const editLabel = ref('')
+const editTargetPoints = ref<number | null>(null)
 
 function openEditWallet(index: number) {
   const w = wallets.value[index]
@@ -329,11 +360,13 @@ function openEditWallet(index: number) {
   editingIndex.value = index
   editAddress.value = w.address
   editLabel.value = w.label
+  editTargetPoints.value = isValidPointTarget(w.targetPoints) ? w.targetPoints : null
   shouldShowEditModal.value = true
 }
 
 function saveEditWallet() {
   if (editingIndex.value === null) return
+  if (!validatePointTarget(editTargetPoints.value)) return
   const address = editAddress.value.trim()
   if (!address || !isValidBscAddress(address)) {
     notify({ severity: 'error', summary: 'Lỗi', detail: 'Ví không hợp lệ' })
@@ -356,7 +389,12 @@ function saveEditWallet() {
     delete transactionsByWallet.value[oldAddress]
   }
 
-  wallets.value[editingIndex.value] = { ...current, address, label }
+  wallets.value[editingIndex.value] = {
+    ...current,
+    address,
+    label,
+    targetPoints: editTargetPoints.value,
+  }
   shouldShowEditModal.value = false
   editingIndex.value = null
   notify({ severity: 'success', summary: 'Đã cập nhật ví', detail: label })
@@ -382,6 +420,22 @@ const formatFeeUSD = (fee: number) =>
 const feeCell = (fee: number, strong = false) =>
   h(NText, { type: fee >= 0 ? 'success' : 'error', strong }, () => formatFeeUSD(fee))
 
+const volumeTargetColumn: DataTableColumns<Wallet>[number] = {
+  title: 'Còn thiếu',
+  key: 'remainingVolume',
+  width: 160,
+  align: 'center',
+  render: (row) =>
+    isValidPointTarget(row.targetPoints)
+      ? h(WalletVolumeTarget, {
+          targetPoints: row.targetPoints,
+          totalVolumeUSD: getFetchedVolume(row.address),
+          tradeAmountUSD: row.tradeAmountUSD,
+          loading: isLoadingWallet(row.address),
+        })
+      : emptyCell(),
+}
+
 const walletColumns = computed<DataTableColumns<Wallet>>(() => [
   {
     title: '#',
@@ -394,7 +448,28 @@ const walletColumns = computed<DataTableColumns<Wallet>>(() => [
     title: 'Ví',
     key: 'wallet',
     minWidth: 180,
-    render: (row) => h('div', { style: 'font-weight:600' }, row.label),
+    render: (row) =>
+      h('div', null, [
+        h('div', { style: 'font-weight:600' }, row.label),
+        ...(isVolumeTargetEnabled.value
+          ? [
+              h(WalletPointTargetSelect, {
+                modelValue: row.targetPoints,
+                style: 'width:140px;margin-top:6px',
+                'onUpdate:modelValue': (value: number | null) => {
+                  row.targetPoints = value
+                },
+              }),
+              h(WalletTradeAmountInput, {
+                modelValue: row.tradeAmountUSD,
+                style: 'width:140px;margin-top:6px',
+                'onUpdate:modelValue': (value: number | null) => {
+                  row.tradeAmountUSD = value
+                },
+              }),
+            ]
+          : []),
+      ]),
   },
   {
     title: 'Khối lượng',
@@ -418,6 +493,7 @@ const walletColumns = computed<DataTableColumns<Wallet>>(() => [
           )
         : emptyCell(),
   },
+  ...(showVolumeTargets.value ? [volumeTargetColumn] : []),
   {
     title: 'Phí',
     key: 'fee',
@@ -513,9 +589,12 @@ const walletRowProps = (row: Wallet) => ({
 const walletRowClassName = (row: Wallet) => (hasData(row.address) ? 'traded-row' : '')
 
 // --- History (transactions) table ---
-const historyData = computed(() =>
-  activeWalletAddress.value ? transactionsByWallet.value[activeWalletAddress.value] || [] : [],
-)
+const historyData = computed(() => {
+  const transactions = activeWalletAddress.value
+    ? transactionsByWallet.value[activeWalletAddress.value] || []
+    : []
+  return [...transactions].sort((a, b) => b.timestamp - a.timestamp)
+})
 
 const historyColumns = computed<DataTableColumns<Transaction>>(() => [
   {
@@ -570,8 +649,11 @@ const historyColumns = computed<DataTableColumns<Transaction>>(() => [
           h('span', null, row.gas),
           h(NText, { depth: 3, style: 'font-size:12px;margin-left:4px' }, () => 'BNB'),
         ]),
-        h(NText, { depth: 3, style: 'font-size:12px;display:block;margin-top:2px' }, () =>
-          `≈ $${formatNumber(row.gas * (prices.value['BNB'] || 0), { maximumFractionDigits: 4 })}`,
+        h(
+          NText,
+          { depth: 3, style: 'font-size:12px;display:block;margin-top:2px' },
+          () =>
+            `≈ $${formatNumber(row.gas * (prices.value['BNB'] || 0), { maximumFractionDigits: 4 })}`,
         ),
       ]),
   },
@@ -582,14 +664,10 @@ function amountCell(token: Transaction['from']) {
     h(NText, { type: 'success', strong: true }, () =>
       formatNumber(token.amount, { maximumFractionDigits: 6 }),
     ),
-    h(
-      'div',
-      { style: 'font-size:12px;display:flex;gap:6px;margin-top:2px' },
-      [
-        h('span', null, token.symbol),
-        h(NText, { depth: 3, style: mono }, () => useShortenAddress(token.address)),
-      ],
-    ),
+    h('div', { style: 'font-size:12px;display:flex;gap:6px;margin-top:2px' }, [
+      h('span', null, token.symbol),
+      h(NText, { depth: 3, style: mono }, () => useShortenAddress(token.address)),
+    ]),
   ])
 }
 </script>
@@ -614,9 +692,15 @@ function amountCell(token: Transaction['from']) {
           />
           <n-button secondary @click="shouldShowWalletModal = true">
             <template #icon>
-              <n-icon><SettingsOutline /></n-icon>
+              <n-icon><WalletOutline /></n-icon>
             </template>
             Quản lý ví
+          </n-button>
+          <n-button secondary @click="shouldShowSettingsModal = true">
+            <template #icon>
+              <n-icon><SettingsOutline /></n-icon>
+            </template>
+            Cài đặt
           </n-button>
           <n-button type="info" :disabled="isLoadingResult" @click="fetchDataMissingOnly">
             <template #icon>
@@ -664,7 +748,7 @@ function amountCell(token: Transaction['from']) {
           :row-class-name="walletRowClassName"
           :bordered="false"
           :single-line="false"
-          :scroll-x="960"
+          :scroll-x="showVolumeTargets ? 1120 : 960"
           striped
         />
 
@@ -686,6 +770,16 @@ function amountCell(token: Transaction['from']) {
                 <div style="min-width: 0">
                   <div class="wc-label">{{ wallet.label }}</div>
                   <div class="wc-addr">{{ useShortenAddress(wallet.address) }}</div>
+                  <WalletPointTargetSelect
+                    v-if="isVolumeTargetEnabled"
+                    v-model="wallet.targetPoints"
+                    style="width: 140px; margin-top: 6px"
+                  />
+                  <WalletTradeAmountInput
+                    v-if="isVolumeTargetEnabled"
+                    v-model="wallet.tradeAmountUSD"
+                    style="width: 140px; margin-top: 6px"
+                  />
                 </div>
               </div>
               <div class="wc-actions">
@@ -726,11 +820,15 @@ function amountCell(token: Transaction['from']) {
             <div v-else-if="hasData(wallet.address)" class="wc-stats">
               <div class="wc-stat">
                 <span class="wc-k">Khối lượng</span>
-                <span class="wc-v">${{ formatNumber(getWalletStats(wallet.address).totalVolumeUSD) }}</span>
+                <span class="wc-v"
+                  >${{ formatNumber(getWalletStats(wallet.address).totalVolumeUSD) }}</span
+                >
               </div>
               <div class="wc-stat">
                 <span class="wc-k">Điểm</span>
-                <n-text class="wc-v" type="success">{{ getWalletStats(wallet.address).points }}</n-text>
+                <n-text class="wc-v" type="success">{{
+                  getWalletStats(wallet.address).points
+                }}</n-text>
               </div>
               <div class="wc-stat">
                 <span class="wc-k">Giao dịch</span>
@@ -768,10 +866,43 @@ function amountCell(token: Transaction['from']) {
               </div>
             </div>
             <div v-else class="wc-empty">Chưa có dữ liệu</div>
+            <div
+              v-if="isVolumeTargetEnabled && isValidPointTarget(wallet.targetPoints)"
+              class="wc-target"
+            >
+              <span class="wc-k">Khối lượng còn thiếu</span>
+              <WalletVolumeTarget
+                :target-points="wallet.targetPoints"
+                :total-volume-u-s-d="getFetchedVolume(wallet.address)"
+                :trade-amount-u-s-d="wallet.tradeAmountUSD"
+                :loading="isLoadingWallet(wallet.address)"
+              />
+            </div>
           </n-card>
         </div>
       </n-space>
     </n-layout-content>
+
+    <!-- Settings dialog -->
+    <n-modal
+      v-model:show="shouldShowSettingsModal"
+      preset="card"
+      title="Cài đặt"
+      :style="{ width: '90vw', maxWidth: '480px' }"
+      header-style="padding: 16px 20px;"
+      content-style="padding: 16px 20px;"
+      footer-style="padding: 12px 20px;"
+    >
+      <n-space align="center" justify="space-between" :wrap="false" :size="16">
+        <n-text strong>Tính khối lượng còn lại</n-text>
+        <n-switch v-model:value="isVolumeTargetEnabled" aria-label="Tính khối lượng còn lại" />
+      </n-space>
+      <template #footer>
+        <n-space justify="end">
+          <n-button @click="shouldShowSettingsModal = false">Đóng</n-button>
+        </n-space>
+      </template>
+    </n-modal>
 
     <!-- History dialog -->
     <n-modal
@@ -837,6 +968,13 @@ function amountCell(token: Transaction['from']) {
                           {{ element.address }}
                         </n-text>
                       </div>
+                      <n-text
+                        v-if="isVolumeTargetEnabled && isValidPointTarget(element.targetPoints)"
+                        depth="3"
+                        style="display: block; font-size: 12px; margin-top: 4px"
+                      >
+                        Mốc {{ element.targetPoints }} điểm
+                      </n-text>
                     </div>
                     <n-space align="center" :size="6" :wrap="false">
                       <n-switch
@@ -891,11 +1029,7 @@ function amountCell(token: Transaction['from']) {
               </template>
             </draggable>
 
-            <n-empty
-              v-else
-              description="Chưa có ví nào trong danh sách"
-              style="padding: 40px 0"
-            >
+            <n-empty v-else description="Chưa có ví nào trong danh sách" style="padding: 40px 0">
               <template #icon>
                 <n-icon><FileTrayOutline /></n-icon>
               </template>
@@ -920,6 +1054,24 @@ function amountCell(token: Transaction['from']) {
                 placeholder="VD: Ví chính"
                 @keyup.enter="addWallet"
               />
+            </n-form-item>
+            <n-form-item v-if="isVolumeTargetEnabled" label="Mốc điểm (tùy chọn)">
+              <n-space vertical style="width: 100%" :size="4">
+                <WalletPointTargetSelect v-model="newWalletTargetPoints" />
+                <n-text depth="3" style="font-size: 12px">
+                  Chọn mốc để hiển thị khối lượng còn thiếu. Xóa mốc để tắt.
+                </n-text>
+                <n-text
+                  v-if="isValidPointTarget(newWalletTargetPoints)"
+                  depth="3"
+                  style="font-size: 12px"
+                >
+                  Mốc {{ newWalletTargetPoints }} điểm cần ${{
+                    formatNumber(2 ** newWalletTargetPoints)
+                  }}
+                  khối lượng.
+                </n-text>
+              </n-space>
             </n-form-item>
             <n-button type="primary" block @click="addWallet">Thêm ví</n-button>
           </n-form>
@@ -971,6 +1123,18 @@ function amountCell(token: Transaction['from']) {
             @keyup.enter="saveEditWallet"
           />
         </n-form-item>
+        <n-form-item v-if="isVolumeTargetEnabled" label="Mốc điểm (tùy chọn)">
+          <n-space vertical style="width: 100%" :size="4">
+            <WalletPointTargetSelect v-model="editTargetPoints" />
+            <n-text depth="3" style="font-size: 12px">
+              Chọn mốc để hiển thị khối lượng còn thiếu. Xóa mốc để tắt.
+            </n-text>
+            <n-text v-if="isValidPointTarget(editTargetPoints)" depth="3" style="font-size: 12px">
+              Mốc {{ editTargetPoints }} điểm cần ${{ formatNumber(2 ** editTargetPoints) }} khối
+              lượng.
+            </n-text>
+          </n-space>
+        </n-form-item>
       </n-form>
       <template #footer>
         <n-space justify="end">
@@ -997,6 +1161,7 @@ function amountCell(token: Transaction['from']) {
 }
 .header-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   max-width: 1200px;
@@ -1023,6 +1188,7 @@ function amountCell(token: Transaction['from']) {
 }
 .header-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
@@ -1031,11 +1197,15 @@ function amountCell(token: Transaction['from']) {
 .wallet-table {
   display: block;
   border-radius: 10px;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 2px 8px rgba(16, 24, 40, 0.05);
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.05),
+    0 2px 8px rgba(16, 24, 40, 0.05);
 }
 /* Cards share the same soft elevation as the table */
 .app-content :deep(.n-card) {
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 2px 8px rgba(16, 24, 40, 0.05);
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.05),
+    0 2px 8px rgba(16, 24, 40, 0.05);
 }
 /* Keep the green tint on traded rows even when striped overrides even rows */
 .wallet-table :deep(.traded-row td) {
@@ -1061,7 +1231,9 @@ function amountCell(token: Transaction['from']) {
   border-color: #10b981;
   border-left: 4px solid #10b981;
   box-shadow: 0 2px 10px rgba(16, 185, 129, 0.18);
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
 }
 .wallet-cards .traded:hover {
   box-shadow: 0 4px 16px rgba(16, 185, 129, 0.28);
@@ -1135,6 +1307,11 @@ function amountCell(token: Transaction['from']) {
   color: #909399;
   font-size: 13px;
 }
+.wc-target {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(16, 24, 40, 0.08);
+}
 
 @media (max-width: 768px) {
   /* Mobile: hide the table, show the card grid instead */
@@ -1163,6 +1340,9 @@ function amountCell(token: Transaction['from']) {
   }
   .header-actions > * {
     width: 100%;
+  }
+  .header-actions > :last-child {
+    grid-column: 1 / -1;
   }
   .header-date {
     width: 100%;

@@ -21,4 +21,6 @@ export interface Wallet {
   address: string
   label: string
   hidden?: boolean
+  targetPoints?: number | null
+  tradeAmountUSD?: number | null
 }
