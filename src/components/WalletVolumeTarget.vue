@@ -19,6 +19,11 @@ const remainingVolumeUSD = computed(() =>
 const remainingTradeCount = computed(() =>
   getRemainingTradeCount(remainingVolumeUSD.value, props.tradeAmountUSD),
 )
+const rawVolumeUSD = computed(() => {
+  if (remainingVolumeUSD.value === null) return null
+  const raw = remainingVolumeUSD.value / 4
+  return raw === 0 ? 0 : raw + 3
+})
 </script>
 
 <template>
@@ -36,8 +41,15 @@ const remainingTradeCount = computed(() =>
       {{ !loading && remainingVolumeUSD === 0 ? 'Đã đạt mốc' : 'Mốc' }} {{ targetPoints }} điểm
     </n-text>
     <n-text
+      v-if="!loading && rawVolumeUSD !== null"
+      class="target-detail"
+      title="Khối lượng còn lại / 4, cộng thêm 3 khi kết quả lớn hơn 0"
+    >
+      Khối lượng raw: ${{ formatNumber(rawVolumeUSD, { minimumFractionDigits: 2 }) }}
+    </n-text>
+    <n-text
       v-if="!loading && remainingTradeCount !== null"
-      class="trade-count"
+      class="target-detail"
       :type="remainingTradeCount === 0 ? 'success' : 'info'"
       title="Khối lượng còn thiếu / tiền mỗi trade / 4, làm tròn lên"
     >
@@ -55,7 +67,7 @@ const remainingTradeCount = computed(() =>
   margin-top: 2px;
   font-size: 12px;
 }
-.trade-count {
+.target-detail {
   display: block;
   margin-top: 4px;
   font-size: 13px;
