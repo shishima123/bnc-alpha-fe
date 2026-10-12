@@ -22,7 +22,7 @@ const remainingTradeCount = computed(() =>
 const rawVolumeUSD = computed(() => {
   if (remainingVolumeUSD.value === null) return null
   const raw = remainingVolumeUSD.value / 4
-  return raw === 0 ? 0 : raw + 3
+  return raw === 0 ? 0 : Math.ceil(raw + 3)
 })
 </script>
 
@@ -43,9 +43,9 @@ const rawVolumeUSD = computed(() => {
     <n-text
       v-if="!loading && rawVolumeUSD !== null"
       class="target-detail"
-      title="Khối lượng còn lại / 4, cộng thêm 3 khi kết quả lớn hơn 0"
+      title="Khối lượng còn lại / 4, cộng thêm 3 khi lớn hơn 0, rồi làm tròn lên"
     >
-      Khối lượng raw: ${{ formatNumber(rawVolumeUSD, { minimumFractionDigits: 2 }) }}
+      Khối lượng raw: ${{ formatNumber(rawVolumeUSD, { maximumFractionDigits: 0 }) }}
     </n-text>
     <n-text
       v-if="!loading && remainingTradeCount !== null"

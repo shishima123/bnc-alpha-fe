@@ -12,7 +12,7 @@ export const useShortenAddress = (address: string, start: number = 6, end: numbe
 export const closestPowerOfTwo = (num: number): number => {
   if (num <= 0) return 0
 
-  return Math.round(Math.log2(num))
+  return Math.max(0, Math.floor(Math.log2(num)))
 }
 
 export const formatNumber = (value: number, options = {}) => {

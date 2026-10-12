@@ -5,6 +5,27 @@ import {
   getRemainingVolumeUSD,
   isValidPointTarget,
 } from '../src/helpers/points.ts'
+import { closestPowerOfTwo } from '../src/helpers/ultils.ts'
+
+test('the screenshot volume earns 15 points until the 16-point threshold is reached', () => {
+  assert.equal(closestPowerOfTwo(65443.79), 15)
+  assert.equal(closestPowerOfTwo(65535.99), 15)
+  assert.equal(closestPowerOfTwo(65536), 16)
+})
+
+test('points increase only when the full power-of-two volume is reached', () => {
+  for (let points = 1; points <= 20; points++) {
+    const threshold = 2 ** points
+    assert.equal(closestPowerOfTwo(threshold - 0.01), points - 1)
+    assert.equal(closestPowerOfTwo(threshold), points)
+  }
+})
+
+test('zero and volumes below the first point threshold never produce negative points', () => {
+  for (const volume of [0, 0.01, 0.5, 1, 1.99]) {
+    assert.equal(closestPowerOfTwo(volume), 0)
+  }
+})
 
 test('the 18-point target requires $127,374.17 more from the example volume', () => {
   const remaining = getRemainingVolumeUSD(134769.83, 18)
