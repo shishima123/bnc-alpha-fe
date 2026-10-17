@@ -72,6 +72,7 @@ const isVolumeTargetEnabled = useStorage(
   'remaining-volume-enabled',
   wallets.value.some((wallet) => isValidPointTarget(wallet.targetPoints)),
 )
+const copyFeeWithoutMinus = useStorage('copy-fee-without-minus', false)
 const transactionsByWallet = ref<Record<string, Transaction[]>>({})
 const prices = ref<PriceMap>({})
 const shouldShowWalletModal = ref(false)
@@ -409,16 +410,49 @@ const mono = 'font-family: var(--n-font-family-mono, monospace);'
 // --- Wallet table (desktop) ---
 const emptyCell = () => h(NText, { depth: 3 }, () => '—')
 
-const formatFeeUSD = (fee: number) =>
+const formatFeeUSD = (fee: number, fractionDigits?: number) =>
   formatNumber(fee || 0, {
     style: 'currency',
     currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 4,
+    minimumFractionDigits: fractionDigits ?? 0,
+    maximumFractionDigits: fractionDigits ?? 4,
   })
 
 const feeCell = (fee: number, strong = false) =>
   h(NText, { type: fee >= 0 ? 'success' : 'error', strong }, () => formatFeeUSD(fee))
+
+async function copyTotalFee(fee: number) {
+  const amount = copyFeeWithoutMinus.value ? Math.abs(fee) : fee
+  const value = formatNumber(amount || 0, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    useGrouping: false,
+  })
+  try {
+    await navigator.clipboard.writeText(value)
+    message.success(`Đã sao chép tổng phí: ${value}`)
+  } catch {
+    message.error('Không thể sao chép tổng phí. Vui lòng thử lại.')
+  }
+}
+
+const totalFeeCell = (fee: number) =>
+  h(
+    NButton,
+    {
+      text: true,
+      class: 'copyable-fee',
+      type: fee >= 0 ? 'success' : 'error',
+      style: 'font-weight: 600',
+      title: 'Bấm để sao chép tổng phí',
+      'aria-label': `Sao chép tổng phí ${formatFeeUSD(fee, 2)}`,
+      onClick: (event: MouseEvent) => {
+        event.stopPropagation()
+        return copyTotalFee(fee)
+      },
+    },
+    () => formatFeeUSD(fee, 2),
+  )
 
 const volumeTargetColumn: DataTableColumns<Wallet>[number] = {
   title: 'Còn thiếu',
@@ -521,7 +555,7 @@ const walletColumns = computed<DataTableColumns<Wallet>>(() => [
         width: 110,
         align: 'center',
         render: (row) =>
-          hasData(row.address) ? feeCell(getWalletStats(row.address).totalFee, true) : emptyCell(),
+          hasData(row.address) ? totalFeeCell(getWalletStats(row.address).totalFee) : emptyCell(),
       },
     ],
   },
@@ -855,13 +889,16 @@ function amountCell(token: Transaction['from']) {
                 </div>
                 <div class="wc-stat">
                   <span class="wc-k">Tổng phí</span>
-                  <n-text
-                    class="wc-v"
+                  <n-button
+                    class="wc-v copyable-fee"
                     :type="getWalletStats(wallet.address).totalFee >= 0 ? 'success' : 'error'"
-                    strong
+                    text
+                    title="Bấm để sao chép tổng phí"
+                    :aria-label="`Sao chép tổng phí ${formatFeeUSD(getWalletStats(wallet.address).totalFee, 2)}`"
+                    @click.stop="copyTotalFee(getWalletStats(wallet.address).totalFee)"
                   >
-                    {{ formatFeeUSD(getWalletStats(wallet.address).totalFee) }}
-                  </n-text>
+                    {{ formatFeeUSD(getWalletStats(wallet.address).totalFee, 2) }}
+                  </n-button>
                 </div>
               </div>
             </div>
@@ -893,9 +930,15 @@ function amountCell(token: Transaction['from']) {
       content-style="padding: 16px 20px;"
       footer-style="padding: 12px 20px;"
     >
-      <n-space align="center" justify="space-between" :wrap="false" :size="16">
-        <n-text strong>Tính khối lượng còn lại</n-text>
-        <n-switch v-model:value="isVolumeTargetEnabled" aria-label="Tính khối lượng còn lại" />
+      <n-space vertical :size="20">
+        <n-space align="center" justify="space-between" :wrap="false" :size="16">
+          <n-text strong>Tính khối lượng còn lại</n-text>
+          <n-switch v-model:value="isVolumeTargetEnabled" aria-label="Tính khối lượng còn lại" />
+        </n-space>
+        <n-space align="center" justify="space-between" :wrap="false" :size="16">
+          <n-text strong>Sao chép không kèm dấu âm</n-text>
+          <n-switch v-model:value="copyFeeWithoutMinus" aria-label="Sao chép không kèm dấu âm" />
+        </n-space>
       </n-space>
       <template #footer>
         <n-space justify="end">
@@ -1158,6 +1201,16 @@ function amountCell(token: Transaction['from']) {
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
+}
+.app-content :deep(.copyable-fee) {
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.app-content :deep(.copyable-fee:hover),
+.app-content :deep(.copyable-fee:focus-visible) {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .header-bar {
   display: flex;
